@@ -3,52 +3,36 @@
 <head>
 <meta charset="UTF-8">
 <title>FoxWebChat</title>
+<link rel="icon" type="image/png" href="icon.png">
 
 <style>
-body {
-  font-family: Arial;
-  background:#111;
-  color:white;
-  padding:20px;
-}
-
-#chat {
-  height:400px;
-  overflow-y:auto;
-  border:1px solid #444;
-  padding:10px;
-  margin-top:10px;
-  background:#1b1b1b;
-}
-
-.message {
-  margin-bottom:5px;
-}
-
-button {
-  cursor:pointer;
-}
+body { font-family: Arial; background:#111; color:white; padding:20px; }
+#chat { height:400px; overflow-y:auto; border:1px solid #444; padding:10px; background:#1b1b1b; margin-top:10px; }
+.message { margin-bottom:6px; }
+button { cursor:pointer; }
+input { padding:5px; }
+.admin { color:red; font-weight:bold; }
 </style>
 </head>
 <body>
 
 <h2>FoxWebChat</h2>
 
-<input id="nameInput" placeholder="Name">
-<button id="joinBtn" onclick="setName()">Join</button>
+<input id="nameInput" placeholder="Name eingeben">
+<button id="joinBtn">Join</button>
 
 <div id="chat"></div>
-
 <br>
 
 <input id="msgInput" placeholder="Nachricht..." disabled>
-<button id="sendBtn" onclick="sendMsg()" disabled>Send</button>
+<button id="sendBtn" disabled>Send</button>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded }
+import { getDatabase, ref, push, onChildAdded } 
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
+// Firebase Config
 const firebaseConfig = {
   apiKey: "DEIN_API_KEY",
   authDomain: "foxwebchat-bd592.firebaseapp.com",
@@ -63,26 +47,39 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 let username = "";
+let isAdmin = false;
+const ADMIN_CODE = "AdminJs93€=lK"; // genau so muss eingegeben werden
 
-window.setName = function() {
+// JOIN
+document.getElementById("joinBtn").addEventListener("click", () => {
   username = document.getElementById("nameInput").value.trim();
-  if (!username) return alert("Name eingeben");
+  if(!username) { alert("Bitte Name eingeben"); return; }
 
-  push(ref(db, "messages"), {
-    user:"System",
-    text: username + " joined"
-  });
+  // Admin prüfen
+  if(username === ADMIN_CODE){
+    isAdmin = true;
+    username = "ADMIN";
+    push(ref(db, "messages"), {
+      user:"System",
+      text:"ADMIN JOINED !BEWARE!"
+    });
+  } else {
+    push(ref(db, "messages"), {
+      user:"System",
+      text: username + " joined"
+    });
+  }
 
+  document.getElementById("nameInput").disabled = true;
+  document.getElementById("joinBtn").disabled = true;
   document.getElementById("msgInput").disabled = false;
   document.getElementById("sendBtn").disabled = false;
+});
 
-  document.getElementById("joinBtn").disabled = true;
-  document.getElementById("nameInput").disabled = true;
-};
-
-window.sendMsg = function() {
+// SEND
+document.getElementById("sendBtn").addEventListener("click", () => {
   const text = document.getElementById("msgInput").value.trim();
-  if (!text) return;
+  if(!text) return;
 
   push(ref(db, "messages"), {
     user: username,
@@ -90,20 +87,31 @@ window.sendMsg = function() {
   });
 
   document.getElementById("msgInput").value = "";
-};
+});
 
-function createMessageElement(data, key) {
+// CREATE MESSAGE ELEMENT
+function createMessageElement(data) {
   const div = document.createElement("div");
   div.className = "message";
-  div.textContent = data.user + ": " + data.text;
 
-  if (data.user !== "System") {
-    const reportBtn = document.createElement("button");
-    reportBtn.textContent = "Report";
-    reportBtn.style.marginLeft = "10px";
-    reportBtn.onclick = () => {
+  if(data.text === "ADMIN JOINED !BEWARE!") {
+    div.textContent = data.text;
+    div.classList.add("admin");
+  } else if(data.user === "ADMIN") {
+    div.textContent = data.user + ": " + data.text;
+    div.classList.add("admin");
+  } else {
+    div.textContent = data.user + ": " + data.text;
+  }
+
+  // Report Button nur für normale User-Nachrichten
+  if(data.user !== "System" && data.user !== "ADMIN") {
+    const report = document.createElement("button");
+    report.textContent = "Report";
+    report.style.marginLeft = "8px";
+    report.addEventListener("click", () => {
       const reason = prompt("Warum melden?");
-      if (!reason) return;
+      if(!reason) return;
 
       push(ref(db, "reports"), {
         reportedUser: data.user,
@@ -113,21 +121,18 @@ function createMessageElement(data, key) {
       });
 
       alert("Report gesendet");
-    };
-
-    div.appendChild(reportBtn);
+    });
+    div.appendChild(report);
   }
 
   return div;
 }
 
-onChildAdded(ref(db, "messages"), (snapshot) => {
+// LIVE CHAT
+onChildAdded(ref(db, "messages"), snapshot => {
   const data = snapshot.val();
-  const key = snapshot.key;
-
-  const element = createMessageElement(data, key);
+  const element = createMessageElement(data);
   document.getElementById("chat").appendChild(element);
-
   document.getElementById("chat").scrollTop =
     document.getElementById("chat").scrollHeight;
 });
