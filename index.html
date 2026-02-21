@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FoxWebChat</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #111;
+  color: white;
+}
+
+#chat {
+  height: 400px;
+  overflow-y: auto;
+  border: 1px solid #444;
+  padding: 10px;
+  margin-top: 10px;
+  background: #1b1b1b;
+}
+
+input, button {
+  padding: 8px;
+  margin-top: 5px;
+}
+
+button {
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<h2>FoxWebChat</h2>
+
+<input id="nameInput" placeholder="Name eingeben">
+<button onclick="setName()">Join</button>
+
+<div id="chat"></div>
+
+<br>
+
+<input id="msgInput" placeholder="Nachricht schreiben..." disabled>
+<button id="sendBtn" onclick="sendMsg()" disabled>Send</button>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getDatabase, ref, push, onChildAdded }
+from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "DEIN_API_KEY",
+  authDomain: "foxwebchat-bd592.firebaseapp.com",
+  databaseURL: "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "foxwebchat-bd592",
+  storageBucket: "foxwebchat-bd592.firebasestorage.app",
+  messagingSenderId: "7129134893",
+  appId: "1:7129134893:web:3a85e2fa031661c5a6c5a4"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let username = "";
+
+window.setName = function() {
+  username = document.getElementById("nameInput").value.trim();
+  if (!username) {
+    alert("Bitte Namen eingeben");
+    return;
+  }
+
+  push(ref(db, "messages"), {
+    user: "System",
+    text: username + " joined"
+  });
+
+  document.getElementById("msgInput").disabled = false;
+  document.getElementById("sendBtn").disabled = false;
+};
+
+window.sendMsg = function() {
+  const text = document.getElementById("msgInput").value.trim();
+  if (!text) return;
+
+  push(ref(db, "messages"), {
+    user: username,
+    text: text
+  });
+
+  document.getElementById("msgInput").value = "";
+};
+
+onChildAdded(ref(db, "messages"), (snapshot) => {
+  const data = snapshot.val();
+  const div = document.createElement("div");
+  div.textContent = data.user + ": " + data.text;
+  document.getElementById("chat").appendChild(div);
+
+  document.getElementById("chat").scrollTop =
+    document.getElementById("chat").scrollHeight;
+});
+</script>
+
+</body>
+</html>
