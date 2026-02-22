@@ -23,7 +23,7 @@ body {
 }
 
 .message {
-  margin-bottom:6px;
+  margin-bottom:8px;
 }
 
 button {
@@ -46,6 +46,11 @@ input {
   padding:10px;
   display:none;
 }
+.reportBox {
+  border:1px solid red;
+  margin:5px;
+  padding:5px;
+}
 </style>
 </head>
 <body>
@@ -65,6 +70,7 @@ input {
 <div id="adminPanel">
   <h3 style="color:red;">ADMIN PANEL</h3>
   <button id="clearChatBtn">Delete All Messages</button>
+  <h4>Reports:</h4>
   <div id="reportList"></div>
 </div>
 
@@ -138,14 +144,16 @@ document.getElementById("sendBtn").addEventListener("click", () => {
 /* ---------- LIVE CHAT ---------- */
 onChildAdded(ref(db,"messages"), snap => {
   const data = snap.val();
+  const messageId = snap.key;
+
   const div = document.createElement("div");
   div.className = "message";
 
-  if(data.text === "ADMIN JOINED !BEWARE!" || data.user === "ADMIN"){
+  if(data.user === "ADMIN" || data.text === "ADMIN JOINED !BEWARE!"){
     div.classList.add("admin-text");
   }
 
-  div.textContent = data.user + ": " + data.text;
+  div.innerHTML = "<b>" + data.user + ":</b> " + data.text;
 
   // Report Button
   if(!isAdmin && data.user !== "System" && data.user !== "ADMIN"){
@@ -157,8 +165,10 @@ onChildAdded(ref(db,"messages"), snap => {
       if(!reason) return;
 
       push(ref(db,"reports"), {
-        reportedUser:data.user,
-        reason:reason
+        reportedUser: data.user,
+        messageText: data.text,
+        messageId: messageId,
+        reason: reason
       });
     };
 
@@ -175,18 +185,21 @@ onChildAdded(ref(db,"reports"), snap=>{
   if(!isAdmin) return;
 
   const data = snap.val();
-  const reportDiv = document.createElement("div");
 
-  reportDiv.textContent =
-    "User: "+data.reportedUser +
-    " | Reason: "+data.reason;
+  const reportDiv = document.createElement("div");
+  reportDiv.className="reportBox";
+
+  reportDiv.innerHTML =
+    "<b>User:</b> " + data.reportedUser + "<br>" +
+    "<b>Message:</b> " + data.messageText + "<br>" +
+    "<b>Reason:</b> " + data.reason + "<br>";
 
   const kickBtn = document.createElement("button");
   kickBtn.textContent = "Kick";
 
   kickBtn.onclick = ()=>{
     set(ref(db,"kicks/"+data.reportedUser), {
-      reason:data.reason
+      reason: data.reason
     });
 
     push(ref(db,"messages"),{
@@ -194,13 +207,15 @@ onChildAdded(ref(db,"reports"), snap=>{
       text:data.reportedUser +
       " got kicked. Reason: " + data.reason
     });
+
+    reportDiv.remove();
   };
 
   reportDiv.appendChild(kickBtn);
   document.getElementById("reportList").appendChild(reportDiv);
 });
 
-/* ---------- ADMIN: DELETE ALL ---------- */
+/* ---------- DELETE ALL MESSAGES ---------- */
 document.getElementById("clearChatBtn").addEventListener("click", ()=>{
   if(isAdmin){
     remove(ref(db,"messages"));
@@ -210,6 +225,7 @@ document.getElementById("clearChatBtn").addEventListener("click", ()=>{
 /* ---------- WATCH KICK STATUS ---------- */
 function watchKickStatus(){
   const kickRef = ref(db,"kicks/"+username);
+
   onValue(kickRef, snap=>{
     if(snap.exists()){
       const reason = snap.val().reason;
@@ -218,7 +234,7 @@ function watchKickStatus(){
   });
 }
 
-/* ---------- BLACK SCREEN ---------- */
+/* ---------- BLACK SCREEN IF KICKED ---------- */
 function showKickScreen(reason){
   document.body.innerHTML = `
     <div style="
