@@ -85,6 +85,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebas
 import { getDatabase, ref, push, onChildAdded, remove, set, onValue }
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
+/* ---------- FIREBASE CONFIG ---------- */
 const firebaseConfig = {
   apiKey: "DEIN_API_KEY",
   authDomain: "foxwebchat-bd592.firebaseapp.com",
@@ -94,18 +95,17 @@ const firebaseConfig = {
   messagingSenderId: "7129134893",
   appId: "1:7129134893:web:3a85e2fa031661c5a6c5a4"
 };
+/* ------------------------------------- */
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 let username = "";
 let isAdmin = false;
-
 const ADMIN_CODE = "AdminJs93€=no";
 
-/* JOIN */
+/* ---------- JOIN ---------- */
 document.getElementById("joinBtn").addEventListener("click", () => {
-
   username = document.getElementById("nameInput").value.trim();
   if(!username) return alert("Please enter a name");
 
@@ -126,7 +126,7 @@ document.getElementById("joinBtn").addEventListener("click", () => {
   watchKickStatus();
 });
 
-/* SEND MESSAGE */
+/* ---------- SEND MESSAGE ---------- */
 document.getElementById("sendBtn").addEventListener("click", () => {
   const text = document.getElementById("msgInput").value.trim();
   if(!text) return;
@@ -135,38 +135,69 @@ document.getElementById("sendBtn").addEventListener("click", () => {
   document.getElementById("msgInput").value="";
 });
 
-/* LIVE CHAT */
+/* ---------- LIVE CHAT ---------- */
 onChildAdded(ref(db,"messages"), snap => {
+
   const data = snap.val();
   const messageId = snap.key;
 
   const div = document.createElement("div");
   div.className = "message";
 
-  if(data.user === "ADMIN"){
-    div.classList.add("admin-text");
-  }
+  if(data.user === "ADMIN") div.classList.add("admin-text");
 
   div.innerHTML = "<b>" + data.user + ":</b> " + data.text;
 
+  /* ---------- REPORT BUTTON WITH SHAME MECHANIC ---------- */
   if(data.user !== "System"){
-    const reportBtn = document.createElement("button");
-    reportBtn.textContent = "Report";
 
-    reportBtn.onclick = () => {
-      const reason = prompt("Report reason:");
-      if(!reason) return;
+    if(!isAdmin && data.user === "ADMIN"){
+      // Normal user tried to report ADMIN → show confirmation
+      const reportBtn = document.createElement("button");
+      reportBtn.textContent = "Report";
 
-      push(ref(db,"reports"), {
-        reportedUser: data.user,
-        messageText: data.text,
-        messageId: messageId,
-        reason: reason,
-        reporter: username
-      });
-    };
+      reportBtn.onclick = () => {
+        const confirmReport = window.confirm("Are you sure you want to report the Admin?");
+        if(!confirmReport) return;
 
-    div.appendChild(reportBtn);
+        // YES clicked → Shame Mechanic
+        push(ref(db,"messages"), {
+          user:"System",
+          text: username + " reported an Admin! What a shame!"
+        });
+
+        push(ref(db,"reports"), {
+          reportedUser: username,
+          messageText: "Tried to report ADMIN",
+          reason: "Attempted to report Admin",
+          reporter: username
+        });
+
+        set(ref(db,"kicks/"+username), { reason:"Attempted to report Admin" });
+      };
+
+      div.appendChild(reportBtn);
+
+    } else {
+      // Normal report logic
+      const reportBtn = document.createElement("button");
+      reportBtn.textContent = "Report";
+
+      reportBtn.onclick = () => {
+        const reason = prompt("Report reason:");
+        if(!reason) return;
+
+        push(ref(db,"reports"), {
+          reportedUser: data.user,
+          messageText: data.text,
+          messageId: messageId,
+          reason: reason,
+          reporter: username
+        });
+      };
+
+      div.appendChild(reportBtn);
+    }
   }
 
   document.getElementById("chat").appendChild(div);
@@ -174,7 +205,7 @@ onChildAdded(ref(db,"messages"), snap => {
     document.getElementById("chat").scrollHeight;
 });
 
-/* ADMIN: REPORT LIST */
+/* ---------- ADMIN PANEL: REPORTS ---------- */
 onChildAdded(ref(db,"reports"), snap => {
   if(!isAdmin) return;
 
@@ -192,15 +223,8 @@ onChildAdded(ref(db,"reports"), snap => {
   kickBtn.textContent = "Kick";
 
   kickBtn.onclick = () => {
-    set(ref(db,"kicks/" + data.reportedUser), {
-      reason: data.reason
-    });
-
-    push(ref(db,"messages"), {
-      user:"System",
-      text:data.reportedUser + " got kicked. Reason: " + data.reason
-    });
-
+    set(ref(db,"kicks/"+data.reportedUser), { reason:data.reason });
+    push(ref(db,"messages"), { user:"System", text:data.reportedUser + " got kicked. Reason: "+data.reason });
     box.remove();
   };
 
@@ -208,7 +232,7 @@ onChildAdded(ref(db,"reports"), snap => {
   document.getElementById("reportList").appendChild(box);
 });
 
-/* ADMIN: KICK LIST */
+/* ---------- ADMIN PANEL: KICK LIST ---------- */
 onChildAdded(ref(db,"kicks"), snap => {
   if(!isAdmin) return;
 
@@ -222,43 +246,35 @@ onChildAdded(ref(db,"kicks"), snap => {
   document.getElementById("kickList").appendChild(div);
 });
 
-/* DELETE ALL MESSAGES */
-document.getElementById("clearChatBtn").onclick = () => {
-  if(isAdmin) remove(ref(db,"messages"));
-};
+/* ---------- DELETE ALL ---------- */
+document.getElementById("clearChatBtn").onclick = () => { if(isAdmin) remove(ref(db,"messages")); };
+document.getElementById("clearReportsBtn").onclick = () => { if(isAdmin) remove(ref(db,"reports")); };
 
-/* DELETE ALL REPORTS */
-document.getElementById("clearReportsBtn").onclick = () => {
-  if(isAdmin) remove(ref(db,"reports"));
-};
-
-/* WATCH KICK */
+/* ---------- WATCH KICK STATUS ---------- */
 function watchKickStatus(){
-  const kickRef = ref(db,"kicks/" + username);
+  const kickRef = ref(db,"kicks/"+username);
   onValue(kickRef, snap => {
-    if(snap.exists()){
-      showKickScreen(snap.val().reason);
-    }
+    if(snap.exists()) showKickScreen(snap.val().reason);
   });
 }
 
-/* BLACK SCREEN */
+/* ---------- BLACK SCREEN ON KICK ---------- */
 function showKickScreen(reason){
   document.body.innerHTML = `
-    <div style="
-      background:black;
-      color:red;
-      height:100vh;
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      flex-direction:column;
-      font-family:Arial;
-      text-align:center;
-    ">
-      <h1>Oops! You got kicked by an Admin!</h1>
-      <p>Reason: ${reason}</p>
-    </div>
+  <div style="
+    background:black;
+    color:red;
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    font-family:Arial;
+    text-align:center;
+  ">
+    <h1>Oops! You got kicked by an Admin!</h1>
+    <p>Reason: ${reason}</p>
+  </div>
   `;
 }
 </script>
