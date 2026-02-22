@@ -58,14 +58,14 @@ input {
 
 <h2>FoxWebChat</h2>
 
-<input id="nameInput" placeholder="Name eingeben">
+<input id="nameInput" placeholder="Enter name">
 <button id="joinBtn">Join</button>
 
 <div id="chat"></div>
 
 <br>
 
-<input id="msgInput" placeholder="Nachricht..." disabled>
+<input id="msgInput" placeholder="Message..." disabled>
 <button id="sendBtn" disabled>Send</button>
 
 <div id="adminPanel">
@@ -98,74 +98,71 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-let username="";
-let isAdmin=false;
+let username = "";
+let isAdmin = false;
 
-/* Admin-Code verschlüsselt */
-function checkAdmin(input){
-  return btoa(input) === "QWRtaW5Kczkz4oKsPW5v";
-}
+const ADMIN_CODE = "AdminJs93€=no";
 
 /* JOIN */
-document.getElementById("joinBtn").addEventListener("click",()=>{
+document.getElementById("joinBtn").addEventListener("click", () => {
 
-  username=document.getElementById("nameInput").value.trim();
-  if(!username) return alert("Name eingeben");
+  username = document.getElementById("nameInput").value.trim();
+  if(!username) return alert("Please enter a name");
 
-  if(checkAdmin(username)){
-    isAdmin=true;
-    username="ADMIN";
-    document.getElementById("adminPanel").style.display="block";
-    push(ref(db,"messages"),{user:"System",text:"ADMIN JOINED !BEWARE!"});
+  if(username === ADMIN_CODE){
+    isAdmin = true;
+    username = "ADMIN";
+    document.getElementById("adminPanel").style.display = "block";
+    push(ref(db,"messages"), {user:"System", text:"ADMIN JOINED - WARNING!"});
   } else {
-    push(ref(db,"messages"),{user:"System",text:username+" joined"});
+    push(ref(db,"messages"), {user:"System", text:username + " joined"});
   }
 
-  document.getElementById("nameInput").disabled=true;
-  document.getElementById("joinBtn").disabled=true;
-  document.getElementById("msgInput").disabled=false;
-  document.getElementById("sendBtn").disabled=false;
+  document.getElementById("nameInput").disabled = true;
+  document.getElementById("joinBtn").disabled = true;
+  document.getElementById("msgInput").disabled = false;
+  document.getElementById("sendBtn").disabled = false;
 
   watchKickStatus();
 });
 
-/* SEND */
-document.getElementById("sendBtn").addEventListener("click",()=>{
-  const text=document.getElementById("msgInput").value.trim();
+/* SEND MESSAGE */
+document.getElementById("sendBtn").addEventListener("click", () => {
+  const text = document.getElementById("msgInput").value.trim();
   if(!text) return;
-  push(ref(db,"messages"),{user:username,text:text});
+
+  push(ref(db,"messages"), {user:username, text:text});
   document.getElementById("msgInput").value="";
 });
 
 /* LIVE CHAT */
-onChildAdded(ref(db,"messages"), snap=>{
-  const data=snap.val();
-  const messageId=snap.key;
+onChildAdded(ref(db,"messages"), snap => {
+  const data = snap.val();
+  const messageId = snap.key;
 
-  const div=document.createElement("div");
-  div.className="message";
+  const div = document.createElement("div");
+  div.className = "message";
 
-  if(data.user==="ADMIN"||data.text==="ADMIN JOINED !BEWARE!"){
+  if(data.user === "ADMIN"){
     div.classList.add("admin-text");
   }
 
-  div.innerHTML="<b>"+data.user+":</b> "+data.text;
+  div.innerHTML = "<b>" + data.user + ":</b> " + data.text;
 
-  // JETZT: Auch Admin darf reporten
-  if(data.user!=="System"){
-    const reportBtn=document.createElement("button");
-    reportBtn.textContent="Report";
+  if(data.user !== "System"){
+    const reportBtn = document.createElement("button");
+    reportBtn.textContent = "Report";
 
-    reportBtn.onclick=()=>{
-      const reason=prompt("Warum melden?");
+    reportBtn.onclick = () => {
+      const reason = prompt("Report reason:");
       if(!reason) return;
 
-      push(ref(db,"reports"),{
-        reportedUser:data.user,
-        messageText:data.text,
-        messageId:messageId,
-        reason:reason,
-        reporter:username
+      push(ref(db,"reports"), {
+        reportedUser: data.user,
+        messageText: data.text,
+        messageId: messageId,
+        reason: reason,
+        reporter: username
       });
     };
 
@@ -173,73 +170,72 @@ onChildAdded(ref(db,"messages"), snap=>{
   }
 
   document.getElementById("chat").appendChild(div);
-  document.getElementById("chat").scrollTop=
+  document.getElementById("chat").scrollTop =
     document.getElementById("chat").scrollHeight;
 });
 
-/* REPORTS */
-onChildAdded(ref(db,"reports"), snap=>{
+/* ADMIN: REPORT LIST */
+onChildAdded(ref(db,"reports"), snap => {
   if(!isAdmin) return;
 
-  const data=snap.val();
-  const reportDiv=document.createElement("div");
-  reportDiv.className="box";
+  const data = snap.val();
+  const box = document.createElement("div");
+  box.className = "box";
 
-  reportDiv.innerHTML=
-    "<b>User:</b> "+data.reportedUser+"<br>"+
-    "<b>Message:</b> "+data.messageText+"<br>"+
-    "<b>Reason:</b> "+data.reason+"<br>"+
-    "<b>Reported by:</b> "+data.reporter+"<br>";
+  box.innerHTML =
+    "<b>User:</b> " + data.reportedUser + "<br>" +
+    "<b>Message:</b> " + data.messageText + "<br>" +
+    "<b>Reason:</b> " + data.reason + "<br>" +
+    "<b>Reported by:</b> " + data.reporter + "<br>";
 
-  const kickBtn=document.createElement("button");
-  kickBtn.textContent="Kick";
+  const kickBtn = document.createElement("button");
+  kickBtn.textContent = "Kick";
 
-  kickBtn.onclick=()=>{
-    set(ref(db,"kicks/"+data.reportedUser),{
-      reason:data.reason
+  kickBtn.onclick = () => {
+    set(ref(db,"kicks/" + data.reportedUser), {
+      reason: data.reason
     });
 
-    push(ref(db,"messages"),{
+    push(ref(db,"messages"), {
       user:"System",
-      text:data.reportedUser+
-      " got kicked. Reason: "+data.reason
+      text:data.reportedUser + " got kicked. Reason: " + data.reason
     });
 
-    reportDiv.remove();
+    box.remove();
   };
 
-  reportDiv.appendChild(kickBtn);
-  document.getElementById("reportList").appendChild(reportDiv);
+  box.appendChild(kickBtn);
+  document.getElementById("reportList").appendChild(box);
 });
 
-/* KICK LIST (UserKick Liste) */
-onChildAdded(ref(db,"kicks"), snap=>{
+/* ADMIN: KICK LIST */
+onChildAdded(ref(db,"kicks"), snap => {
   if(!isAdmin) return;
 
-  const user=snap.key;
-  const data=snap.val();
+  const user = snap.key;
+  const data = snap.val();
 
-  const div=document.createElement("div");
-  div.className="box";
-  div.textContent=user+" | Reason: "+data.reason;
+  const div = document.createElement("div");
+  div.className = "box";
+  div.textContent = user + " | Reason: " + data.reason;
 
   document.getElementById("kickList").appendChild(div);
 });
 
 /* DELETE ALL MESSAGES */
-document.getElementById("clearChatBtn").onclick=()=>{
+document.getElementById("clearChatBtn").onclick = () => {
   if(isAdmin) remove(ref(db,"messages"));
 };
 
 /* DELETE ALL REPORTS */
-document.getElementById("clearReportsBtn").onclick=()=>{
+document.getElementById("clearReportsBtn").onclick = () => {
   if(isAdmin) remove(ref(db,"reports"));
 };
 
-/* WATCH KICK STATUS */
+/* WATCH KICK */
 function watchKickStatus(){
-  const kickRef=ref(db,"kicks/"+username);
-  onValue(kickRef,snap=>{
+  const kickRef = ref(db,"kicks/" + username);
+  onValue(kickRef, snap => {
     if(snap.exists()){
       showKickScreen(snap.val().reason);
     }
@@ -248,21 +244,21 @@ function watchKickStatus(){
 
 /* BLACK SCREEN */
 function showKickScreen(reason){
-  document.body.innerHTML=`
-  <div style="
-    background:black;
-    color:red;
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    flex-direction:column;
-    font-family:Arial;
-    text-align:center;
-  ">
-    <h1>Oops! You got kicked by an Admin!</h1>
-    <p>Reason: ${reason}</p>
-  </div>
+  document.body.innerHTML = `
+    <div style="
+      background:black;
+      color:red;
+      height:100vh;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      flex-direction:column;
+      font-family:Arial;
+      text-align:center;
+    ">
+      <h1>Oops! You got kicked by an Admin!</h1>
+      <p>Reason: ${reason}</p>
+    </div>
   `;
 }
 </script>
