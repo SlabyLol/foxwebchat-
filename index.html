@@ -9,9 +9,10 @@
 body { font-family: Arial; background:#111; color:white; padding:20px; }
 #chat { height:400px; overflow-y:auto; border:1px solid #444; padding:10px; background:#1b1b1b; margin-top:10px; }
 .message { margin-bottom:6px; }
-button { cursor:pointer; }
+button { cursor:pointer; margin-left:5px; }
 input { padding:5px; }
 .admin { color:red; font-weight:bold; }
+#adminPanel { margin-top:20px; border:1px solid red; padding:10px; display:none; }
 </style>
 </head>
 <body>
@@ -22,17 +23,22 @@ input { padding:5px; }
 <button id="joinBtn">Join</button>
 
 <div id="chat"></div>
-<br>
 
+<br>
 <input id="msgInput" placeholder="Nachricht..." disabled>
 <button id="sendBtn" disabled>Send</button>
 
+<div id="adminPanel">
+  <h3 style="color:red;">ADMIN PANEL</h3>
+  <button id="clearChatBtn">Delete All Messages</button>
+  <div id="reportList"></div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded } 
+import { getDatabase, ref, push, onChildAdded, remove, set }
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
-// Firebase Config
 const firebaseConfig = {
   apiKey: "DEIN_API_KEY",
   authDomain: "foxwebchat-bd592.firebaseapp.com",
@@ -48,25 +54,29 @@ const db = getDatabase(app);
 
 let username = "";
 let isAdmin = false;
-const ADMIN_CODE = "AdminJs93€=no"; // genau so muss eingegeben werden
+let isKicked = false;
+
+const ADMIN_CODE = "AdminJs93€=lK";
+
 
 // JOIN
 document.getElementById("joinBtn").addEventListener("click", () => {
   username = document.getElementById("nameInput").value.trim();
-  if(!username) { alert("Bitte Name eingeben"); return; }
+  if(!username) return alert("Name eingeben");
 
-  // Admin prüfen
   if(username === ADMIN_CODE){
     isAdmin = true;
     username = "ADMIN";
-    push(ref(db, "messages"), {
+    document.getElementById("adminPanel").style.display = "block";
+
+    push(ref(db,"messages"), {
       user:"System",
       text:"ADMIN JOINED !BEWARE!"
     });
   } else {
-    push(ref(db, "messages"), {
+    push(ref(db,"messages"), {
       user:"System",
-      text: username + " joined"
+      text:username + " joined"
     });
   }
 
@@ -76,65 +86,95 @@ document.getElementById("joinBtn").addEventListener("click", () => {
   document.getElementById("sendBtn").disabled = false;
 });
 
+
 // SEND
 document.getElementById("sendBtn").addEventListener("click", () => {
+  if(isKicked) return;
+
   const text = document.getElementById("msgInput").value.trim();
   if(!text) return;
 
-  push(ref(db, "messages"), {
-    user: username,
-    text: text
+  push(ref(db,"messages"), {
+    user:username,
+    text:text
   });
 
-  document.getElementById("msgInput").value = "";
+  document.getElementById("msgInput").value="";
 });
 
-// CREATE MESSAGE ELEMENT
-function createMessageElement(data) {
-  const div = document.createElement("div");
-  div.className = "message";
 
-  if(data.text === "ADMIN JOINED !BEWARE!") {
-    div.textContent = data.text;
+// LIVE CHAT
+onChildAdded(ref(db,"messages"), snapshot => {
+  const data = snapshot.val();
+  const div = document.createElement("div");
+  div.className="message";
+
+  if(data.user === "ADMIN"){
     div.classList.add("admin");
-  } else if(data.user === "ADMIN") {
-    div.textContent = data.user + ": " + data.text;
-    div.classList.add("admin");
-  } else {
-    div.textContent = data.user + ": " + data.text;
   }
 
-  // Report Button nur für normale User-Nachrichten
-  if(data.user !== "System" && data.user !== "ADMIN") {
+  div.textContent = data.user + ": " + data.text;
+
+  if(data.text.startsWith("You got kicked") && data.user === username){
+    isKicked = true;
+    document.getElementById("msgInput").disabled = true;
+    document.getElementById("sendBtn").disabled = true;
+  }
+
+  if(data.user !== "System" && data.user !== "ADMIN"){
     const report = document.createElement("button");
-    report.textContent = "Report";
-    report.style.marginLeft = "8px";
-    report.addEventListener("click", () => {
+    report.textContent="Report";
+
+    report.onclick=()=>{
       const reason = prompt("Warum melden?");
       if(!reason) return;
 
-      push(ref(db, "reports"), {
-        reportedUser: data.user,
-        message: data.text,
-        reason: reason,
-        timestamp: Date.now()
+      push(ref(db,"reports"),{
+        reportedUser:data.user,
+        message:data.text,
+        reason:reason
       });
+    }
 
-      alert("Report gesendet");
-    });
     div.appendChild(report);
   }
 
-  return div;
-}
-
-// LIVE CHAT
-onChildAdded(ref(db, "messages"), snapshot => {
-  const data = snapshot.val();
-  const element = createMessageElement(data);
-  document.getElementById("chat").appendChild(element);
+  document.getElementById("chat").appendChild(div);
   document.getElementById("chat").scrollTop =
     document.getElementById("chat").scrollHeight;
+});
+
+
+// ADMIN: REPORT LIST
+onChildAdded(ref(db,"reports"), snapshot=>{
+  if(!isAdmin) return;
+
+  const data = snapshot.val();
+  const reportDiv = document.createElement("div");
+
+  reportDiv.innerHTML =
+    "User: "+data.reportedUser+
+    " | Reason: "+data.reason;
+
+  const kickBtn = document.createElement("button");
+  kickBtn.textContent="Kick User";
+
+  kickBtn.onclick=()=>{
+    push(ref(db,"messages"),{
+      user:data.reportedUser,
+      text:"You got kicked by ADMIN! Reason: "+data.reason
+    });
+  }
+
+  reportDiv.appendChild(kickBtn);
+  document.getElementById("reportList").appendChild(reportDiv);
+});
+
+
+// ADMIN: DELETE ALL
+document.getElementById("clearChatBtn").addEventListener("click",()=>{
+  if(!isAdmin) return;
+  remove(ref(db,"messages"));
 });
 </script>
 
