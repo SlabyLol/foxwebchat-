@@ -232,7 +232,7 @@ onChildAdded(ref(db,"reports"), snap => {
   document.getElementById("reportList").appendChild(box);
 });
 
-/* ---------- ADMIN PANEL: KICK LIST ---------- */
+/* ---------- ADMIN PANEL: KICK LIST WITH DELETE DATA ---------- */
 onChildAdded(ref(db,"kicks"), snap => {
   if(!isAdmin) return;
 
@@ -241,8 +241,34 @@ onChildAdded(ref(db,"kicks"), snap => {
 
   const div = document.createElement("div");
   div.className = "box";
-  div.textContent = user + " | Reason: " + data.reason;
+  div.innerHTML = "<b>" + user + "</b> | Reason: " + data.reason + " ";
 
+  // DELETE DATA BUTTON
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete Data";
+
+  deleteBtn.onclick = async () => {
+    // Remove messages from this user
+    const messagesRef = ref(db,"messages");
+    onChildAdded(messagesRef, msgSnap => {
+      const msgData = msgSnap.val();
+      if(msgData.user === user) remove(ref(db,"messages/"+msgSnap.key));
+    });
+
+    // Remove reports about this user
+    const reportsRef = ref(db,"reports");
+    onChildAdded(reportsRef, repSnap => {
+      const repData = repSnap.val();
+      if(repData.reportedUser === user) remove(ref(db,"reports/"+repSnap.key));
+    });
+
+    // Remove the kick entry
+    remove(ref(db,"kicks/"+user));
+
+    div.remove(); // Remove from admin panel
+  };
+
+  div.appendChild(deleteBtn);
   document.getElementById("kickList").appendChild(div);
 });
 
