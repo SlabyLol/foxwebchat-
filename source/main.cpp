@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <malloc.h> // <-- Wichtig für memalign!
 #include <curl/curl.h>
 
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
@@ -12,7 +13,7 @@ static bool isAdmin = false;
 static bool isKicked = false;
 static char kickReason[128] = "";
 
-// HTTP POST Helper for Firebase REST API
+// HTTP POST Helper für Firebase REST API
 void firebase_post(const char* path, const char* json_data) {
     CURL *curl = curl_easy_init();
     if(curl) {
@@ -25,7 +26,7 @@ void firebase_post(const char* path, const char* json_data) {
         curl_easy_setopt(curl, CURLOPT_URL, full_url);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_data);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L); // Allow 3DS SSL handshake
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         
         curl_easy_perform(curl);
         curl_easy_cleanup(curl);
@@ -33,7 +34,7 @@ void firebase_post(const char* path, const char* json_data) {
     }
 }
 
-// Open 3DS On-Screen Keyboard
+// 3DS Tastatur aufrufen
 void open_keyboard(char* out_text, size_t max_len, const char* hint) {
     SwkbdState swkbd;
     swkbdInit(&swkbd, SWKBD_TYPE_NORMAL, 2, -1);
@@ -41,7 +42,7 @@ void open_keyboard(char* out_text, size_t max_len, const char* hint) {
     swkbdInputText(&swkbd, out_text, max_len);
 }
 
-// Black Screen on Kick
+// Anzeige bei Kick
 void render_kick_screen() {
     consoleClear();
     printf("\x1b[16;5H\x1b[31mOops! You got kicked by an Admin!\x1b[0m\n");
@@ -52,9 +53,11 @@ int main(int argc, char **argv) {
     gfxInitDefault();
     consoleInit(GFX_TOP, NULL);
     
-    // Init SOC for 3DS Internet
+    // SOC-Netzwerkspeicher initialisieren
     u32 *soc_buffer = (u32*)memalign(0x1000, 0x100000);
-    socInit(soc_buffer, 0x100000);
+    if (soc_buffer != NULL) {
+        socInit(soc_buffer, 0x100000);
+    }
     curl_global_init(CURL_GLOBAL_ALL);
 
     printf("\x1b[1;1HFoxWebChat - 3DS Edition\n");
@@ -75,7 +78,7 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        // JOIN ACTION
+        // JOIN LOGIK
         if ((kDown & KEY_A) && strlen(username) == 0) {
             open_keyboard(username, sizeof(username), "Enter Name");
             
@@ -95,7 +98,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        // SEND MESSAGE ACTION
+        // NACHRICHT SENDEN
         if ((kDown & KEY_X) && strlen(username) > 0) {
             char text[256] = "";
             open_keyboard(text, sizeof(text), "Message...");
@@ -107,7 +110,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        // SHAME MECHANIC TEST (Report Admin Button Logic)
+        // SHAME MECHANIC TEST
         if ((kDown & KEY_Y) && strlen(username) > 0 && !isAdmin) {
             printf("\x1b[31m[!] Executing Admin Report Shame Mechanic...\x1b[0m\n");
             
@@ -119,7 +122,6 @@ int main(int argc, char **argv) {
             snprintf(reportPayload, sizeof(reportPayload), "{\"reportedUser\":\"%s\",\"messageText\":\"Tried to report ADMIN\",\"reason\":\"Attempted to report Admin\",\"reporter\":\"%s\"}", username, username);
             firebase_post("reports", reportPayload);
 
-            // Set kick state locally & server
             isKicked = true;
             strcpy(kickReason, "Attempted to report Admin");
         }
@@ -131,6 +133,7 @@ int main(int argc, char **argv) {
 
     curl_global_cleanup();
     socExit();
+    if (soc_buffer) free(soc_buffer);
     gfxExit();
     return 0;
 }
