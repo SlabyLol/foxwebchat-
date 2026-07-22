@@ -20,8 +20,9 @@ jobs:
           dkp-pacman -Sy --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls
 
       - name: Build Project
+        shell: bash
         run: |
-          source /etc/profile.d/devkit-env.sh
+          . /etc/profile.d/devkit-env.sh
           make
 
       - name: Upload CIA Artifact
