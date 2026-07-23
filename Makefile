@@ -17,16 +17,16 @@ APP_AUTHOR      := DarkFox Co.
 PORTLIBS        := $(DEVKITPRO)/portlibs/3ds
 CTRULIB         := $(DEVKITPRO)/libctru
 
-# Architecture & Compiler Flags
+# Architecture parameters for Compiler ONLY
 ARCH            := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
 CFLAGS          := -Wall -O2 -mword-relocations $(ARCH) -I$(PORTLIBS)/include -I$(CTRULIB)/include
 CXXFLAGS        := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 
-# Linker Search Paths & Specs (Standard devkitARM LDFLAGS)
-LDFLAGS         := -specs=3dsx.specs $(ARCH) -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
+# LDFLAGS without $(ARCH) or -m flags!
+LDFLAGS         := -specs=3dsx.specs -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
 
-# Order is critical: curl requires crypto/ssl libs, ctru at the end
+# Libraries order
 LIBS            := -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lctru -lm
 
 #---------------------------------------------------------------------------------
