@@ -8,14 +8,22 @@ DATA            := data
 INCLUDES        := include
 
 APP_TITLE       := FoxWebChat 3DS
-APP_DESCRIPTION := Firebase Chat App for Nintendo 3DS
+APP_DESCRIPTION := Public Chat App for Nintendo 3DS
 APP_AUTHOR      := DarkFox Co.
 
+#---------------------------------------------------------------------------------
+# Library & Header Directories
+#---------------------------------------------------------------------------------
+PORTLIBS        := $(DEVKITPRO)/portlibs/3ds
+CTRULIB         := $(DEVKITPRO)/libctru
+
+LIBDIRS         := $(PORTLIBS) $(CTRULIB)
+INCDIRS         := $(PORTLIBS)/include $(CTRULIB)/include
+
+# Linker Flags & Libraries
 LIBS            := -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lctru -lm
 
-#---------------------------------------------------------------------------------
 # Include devkitARM Rules
-#---------------------------------------------------------------------------------
 include $(DEVKITARM)/3ds_rules
 
 #---------------------------------------------------------------------------------
