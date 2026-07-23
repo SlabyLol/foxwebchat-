@@ -111,7 +111,6 @@ void check_kick_status() {
     }
 }
 
-// Hilfsfunktion: String zwischen zwei Anführungszeichen lesen
 std::string parse_json_value(const std::string& block, const std::string& key) {
     size_t keyPos = block.find("\"" + key + "\"");
     if (keyPos == std::string::npos) return "Unknown";
@@ -128,7 +127,6 @@ std::string parse_json_value(const std::string& block, const std::string& key) {
     return block.substr(startQuote + 1, endQuote - startQuote - 1);
 }
 
-// Nachrichten zuverlässig parsen
 void fetch_messages() {
     std::string json = firebase_get("messages");
     if(json.empty() || json == "null") return;
@@ -151,16 +149,12 @@ void fetch_messages() {
     }
 }
 
-// Reports parsen
 void fetch_reports() {
-    if(!isAdmin) return;
     std::string json = firebase_get("reports");
-    if(json.empty() || json == "null") {
-        reportList.clear();
-        return;
-    }
-
     reportList.clear();
+
+    if(json.empty() || json == "null") return;
+
     size_t pos = 0;
     while ((pos = json.find("{", pos)) != std::string::npos) {
         size_t endPos = json.find("}", pos);
@@ -194,7 +188,9 @@ void redraw_screen() {
         return;
     }
 
-    printf("\x1b[1;1HFoxWebChat 3DS - User: %s\n", strlen(username) > 0 ? username : "Not joined");
+    printf("\x1b[1;1HFoxWebChat 3DS - User: %s %s\n", 
+           strlen(username) > 0 ? username : "Not joined", 
+           isAdmin ? "\x1b[33;1m(ADMIN)\x1b[0m" : "");
     printf("==================================================\n");
 
     if (strlen(username) == 0) {
@@ -234,7 +230,6 @@ void redraw_screen() {
     } else {
         for (size_t i = 0; i < messageList.size(); i++) {
             if ((int)i == selectedMsgIndex) {
-                // Helles Cyan (\x1b[36;1m) für gute Lesbarkeit auf dem 3DS
                 printf("\x1b[36;1m> [%s]: %s\x1b[0m\n", messageList[i].user.c_str(), messageList[i].text.c_str());
             } else {
                 printf("  [%s]: %s\n", messageList[i].user.c_str(), messageList[i].text.c_str());
@@ -270,12 +265,16 @@ int main(int argc, char **argv) {
         if (!isKicked) {
             // JOIN (A)
             if ((kDown & KEY_A) && strlen(username) == 0) {
-                open_keyboard(username, sizeof(username), "Enter Name");
-                if (strlen(username) > 0) {
-                    if (strcmp(username, ADMIN_CODE) == 0) {
+                char inputName[64] = "";
+                open_keyboard(inputName, sizeof(inputName), "Enter Name / Admin Code");
+                if (strlen(inputName) > 0) {
+                    if (strcmp(inputName, ADMIN_CODE) == 0) {
                         isAdmin = true;
                         strcpy(username, "ADMIN");
+                        firebase_post("messages", "{\"user\":\"System\",\"text\":\"ADMIN JOINED!\"}");
                     } else {
+                        isAdmin = false;
+                        strcpy(username, inputName);
                         char msg[128];
                         snprintf(msg, sizeof(msg), "{\"user\":\"System\",\"text\":\"%s joined\"}", username);
                         firebase_post("messages", msg);
