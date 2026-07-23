@@ -104,8 +104,10 @@ let username = "";
 let isAdmin = false;
 const ADMIN_CODE = "AdminJs93€=no";
 
-/* ---------- JOIN ---------- */
-document.getElementById("joinBtn").addEventListener("click", () => {
+/* ---------- JOIN FUNKTION ---------- */
+function joinChat() {
+  if(username) return; // Bereits gejoint
+
   username = document.getElementById("nameInput").value.trim();
   if(!username) return alert("Please enter a name");
 
@@ -124,20 +126,30 @@ document.getElementById("joinBtn").addEventListener("click", () => {
   document.getElementById("sendBtn").disabled = false;
 
   watchKickStatus();
+}
+
+document.getElementById("joinBtn").addEventListener("click", joinChat);
+document.getElementById("nameInput").addEventListener("keypress", (e) => {
+  if(e.key === "Enter") joinChat();
 });
 
-/* ---------- SEND MESSAGE ---------- */
-document.getElementById("sendBtn").addEventListener("click", () => {
-  const text = document.getElementById("msgInput").value.trim();
+/* ---------- SEND MESSAGE FUNKTION ---------- */
+function sendMessage() {
+  const input = document.getElementById("msgInput");
+  const text = input.value.trim();
   if(!text) return;
 
   push(ref(db,"messages"), {user:username, text:text});
-  document.getElementById("msgInput").value="";
+  input.value = "";
+}
+
+document.getElementById("sendBtn").addEventListener("click", sendMessage);
+document.getElementById("msgInput").addEventListener("keypress", (e) => {
+  if(e.key === "Enter") sendMessage();
 });
 
 /* ---------- LIVE CHAT ---------- */
 onChildAdded(ref(db,"messages"), snap => {
-
   const data = snap.val();
   const messageId = snap.key;
 
@@ -152,7 +164,6 @@ onChildAdded(ref(db,"messages"), snap => {
   if(data.user !== "System"){
 
     if(!isAdmin && data.user === "ADMIN"){
-      // Normal user tried to report ADMIN → show confirmation
       const reportBtn = document.createElement("button");
       reportBtn.textContent = "Report";
 
@@ -160,7 +171,6 @@ onChildAdded(ref(db,"messages"), snap => {
         const confirmReport = window.confirm("Are you sure you want to report the Admin?");
         if(!confirmReport) return;
 
-        // YES clicked → Shame Mechanic
         push(ref(db,"messages"), {
           user:"System",
           text: username + " reported an Admin! What a shame!"
@@ -179,7 +189,6 @@ onChildAdded(ref(db,"messages"), snap => {
       div.appendChild(reportBtn);
 
     } else {
-      // Normal report logic
       const reportBtn = document.createElement("button");
       reportBtn.textContent = "Report";
 
@@ -201,8 +210,7 @@ onChildAdded(ref(db,"messages"), snap => {
   }
 
   document.getElementById("chat").appendChild(div);
-  document.getElementById("chat").scrollTop =
-    document.getElementById("chat").scrollHeight;
+  document.getElementById("chat").scrollTop = document.getElementById("chat").scrollHeight;
 });
 
 /* ---------- ADMIN PANEL: REPORTS ---------- */
@@ -243,29 +251,24 @@ onChildAdded(ref(db,"kicks"), snap => {
   div.className = "box";
   div.innerHTML = "<b>" + user + "</b> | Reason: " + data.reason + " ";
 
-  // DELETE DATA BUTTON
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "Delete Data";
 
   deleteBtn.onclick = async () => {
-    // Remove messages from this user
     const messagesRef = ref(db,"messages");
     onChildAdded(messagesRef, msgSnap => {
       const msgData = msgSnap.val();
       if(msgData.user === user) remove(ref(db,"messages/"+msgSnap.key));
     });
 
-    // Remove reports about this user
     const reportsRef = ref(db,"reports");
     onChildAdded(reportsRef, repSnap => {
       const repData = repSnap.val();
       if(repData.reportedUser === user) remove(ref(db,"reports/"+repSnap.key));
     });
 
-    // Remove the kick entry
     remove(ref(db,"kicks/"+user));
-
-    div.remove(); // Remove from admin panel
+    div.remove();
   };
 
   div.appendChild(deleteBtn);
