@@ -17,16 +17,17 @@ APP_AUTHOR      := DarkFox Co.
 PORTLIBS        := $(DEVKITPRO)/portlibs/3ds
 CTRULIB         := $(DEVKITPRO)/libctru
 
-# C/C++ Compiler Flags (Hier gehören ARM-Flags hin!)
+# Compiler & Linker Compiler Driver
 ARCH            := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
 CFLAGS          := -Wall -O2 -mword-relocations $(ARCH) -I$(PORTLIBS)/include -I$(CTRULIB)/include
 CXXFLAGS        := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 
-# Linker Flags (OHNE -mtp=soft oder $(ARCH)!)
-LDFLAGS         := -specs=3dsx.specs -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
+# Force linking via g++ driver instead of raw ld
+LD              := $(CXX)
+LDFLAGS         := -specs=3dsx.specs $(ARCH) -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
 
-# Bibliotheken in exakter Reihenfolge
+# Libraries
 LIBS            := -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lctru -lm
 
 #---------------------------------------------------------------------------------
