@@ -1,4 +1,4 @@
-name: Build Nintendo 3DS CIA & 3DSX
+name: Build Nintendo 3DS CIA
 
 on:
   push:
@@ -6,50 +6,41 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest		#The process should run on Ubuntu
     container:
-      image: devkitpro/devkitarm:latest
-
+      image: devkitpro/devkitarm	#Using the DevKitPro DevKitARM container
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-
-      - name: Fix devkitPro 403 Forbidden Error
-        run: |
-          sed -i 's/#XferCommand = \/usr\/bin\/curl/XferCommand = \/usr\/bin\/curl -A "Mozilla\/5.0 (X11; Linux x86_64)" -L -C - -f -o %o %u/' /etc/pacman.conf
-          dkp-pacman -Syy
-
-      - name: Install dependencies & Tools
-        run: |
-          dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
-
-      - name: Build Bannertool
-        run: |
-          git clone https://github.com/carstene1ns/3ds-bannertool.git
-          cd 3ds-bannertool
-          cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          cmake --build build
-          cmake --install build
-          cd .. && rm -rf 3ds-bannertool
-
-      - name: Build Makerom
-        run: |
-          git clone --recursive https://github.com/3DSGuy/Project_CTR
-          cd Project_CTR/makerom
-          make deps
-          make
-          cp ./bin/makerom /usr/local/bin/makerom
-          chmod +x /usr/local/bin/makerom
-          cd ../.. && rm -rf Project_CTR
-
-      - name: Build App (3DSX & CIA)
-        run: |
-          make cia
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: FoxWebChat-3DS
-          path: |
-            *.cia
-            *.3dsx
+    - name: Checkout repo
+      uses: actions/checkout@v4		#Use Checkout Version 4
+    - name: Build BannerTool		#In order to make a CIA file you need BannerTool and Makerom
+      continue-on-error: true		#For debbuging, can be removed
+      run: |
+        git clone https://github.com/carstene1ns/3ds-bannertool.git
+        cd 3ds-bannertool
+        cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+        cmake --build build
+        sudo cmake --install build
+    - name: Build Makerom		#In order to make a CIA file you need BannerTool and Makerom
+      continue-on-error: true		#For debbuging, can be removed
+      run: |
+        git clone --recursive https://github.com/3DSGuy/Project_CTR
+        cd Project_CTR/makerom
+        make deps
+        make
+        sudo cp ./bin/makerom /usr/local/bin/makerom	#The makerom executable should be
+        sudo chmod +x /usr/local/bin/makerom		#copied to bin folder and add exe attribute
+        cd ..
+        cd ..
+    - name: Build CIA			#Build the code
+      continue-on-error: true
+      working-directory: .
+      run: | 
+        sudo dkp-pacman -S --noconfirm 3dstools	tex3ds #if any other package is requiered can be installed
+        make
+    - name: Upload CIA
+      uses: actions/upload-artifact@v4	#Upload the artifacts using the 3dsx and the cia files
+      with:
+          name: FoxWebChat
+          path: | 
+            ./*.cia
+            ./*.3dsx
