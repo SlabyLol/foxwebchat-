@@ -7,16 +7,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkitarm
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Setup devkitPRO
+        uses: devkitPro/setup-devkitpro@v1
+        with:
+          3ds: true
+
       - name: Install dependencies & Tools
         run: |
-          sudo dkp-pacman -Syu --noconfirm
-          sudo dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          sudo dkp-pacman -Sy --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build Bannertool
         run: |
@@ -39,6 +41,7 @@ jobs:
 
       - name: Build App (3DSX & CIA)
         run: |
+          source /etc/profile.d/devkit-env.sh
           make cia
 
       - name: Upload Artifacts
