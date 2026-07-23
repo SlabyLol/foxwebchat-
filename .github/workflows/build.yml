@@ -20,6 +20,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Fix devkitPro Pacman User-Agent (Fix 403 Error)
+        run: |
+          sed -i 's/#XferCommand = \/usr\/bin\/curl/XferCommand = \/usr\/bin\/curl -s -L -A "Mozilla\/5.0" -C - -o %o %u/' /opt/devkitpro/pacman/etc/pacman.conf
+
       - name: Install 3DS Dependencies
         run: |
           dkp-pacman -Sy --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls
