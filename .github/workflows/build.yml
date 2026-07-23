@@ -1,10 +1,15 @@
-name: Build FoxWebChat 3DSX
+name: Build and Release FoxWebChat 3DSX
 
 on:
   push:
     branches: [ "main", "master" ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ "main", "master" ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -25,9 +30,19 @@ jobs:
           . /etc/profile.d/devkit-env.sh
           make
 
-      - name: Upload 3DSX Artifact
+      - name: Upload 3DSX Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: FoxWebChat-3DSX-Build
-          path: |
-            *.3dsx
+          path: FoxWebChat.3dsx
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FoxWebChat.3dsx
+          name: FoxWebChat 3DSX ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
