@@ -42,7 +42,7 @@ jobs:
         dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds || true
         make cia
 
-- name: Upload CIA
+    - name: Upload CIA
       uses: actions/upload-artifact@v4
       with:
           name: FoxWebChat
