@@ -99,6 +99,22 @@ void firebase_put(const char* path, const char* json_data) {
     }
 }
 
+void firebase_delete(const char* path) {
+    CURL *curl = curl_easy_init();
+    if(curl) {
+        char full_url[256];
+        snprintf(full_url, sizeof(full_url), "%s/%s.json", FIREBASE_URL, path);
+
+        curl_easy_setopt(curl, CURLOPT_URL, full_url);
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
+        
+        curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+    }
+}
+
 void check_kick_status() {
     if(strlen(username) == 0) return;
     char path[128];
@@ -108,6 +124,8 @@ void check_kick_status() {
     if(!json.empty() && json != "null") {
         isKicked = true;
         snprintf(kickReason, sizeof(kickReason), "Kicked by Admin");
+    } else {
+        isKicked = false;
     }
 }
 
@@ -129,10 +147,10 @@ std::string parse_json_value(const std::string& block, const std::string& key) {
 
 void fetch_messages() {
     std::string json = firebase_get("messages");
+    messageList.clear();
+
     if(json.empty() || json == "null") return;
 
-    messageList.clear();
-    
     size_t pos = 0;
     while ((pos = json.find("{", pos)) != std::string::npos) {
         size_t endPos = json.find("}", pos);
@@ -185,6 +203,7 @@ void redraw_screen() {
     if (isKicked) {
         printf("\x1b[16;3H\x1b[31;1mYou have been kicked by an Admin!\x1b[0m\n");
         printf("\x1b[18;3HReason: %s\n", kickReason);
+        printf("\x1b[22;3HPress [START] to exit\n");
         return;
     }
 
@@ -195,12 +214,15 @@ void redraw_screen() {
 
     if (strlen(username) == 0) {
         printf("Press (A) to enter name / join\n");
+        printf("Press [START] to exit\n");
         return;
     }
 
     if (showAdminPanel) {
         printf("\x1b[31;1m=== ADMIN PANEL ===\x1b[0m\n");
-        printf("(B): Close | (X): Kick Selected User\n");
+        printf("(B): Close Panel | (X): Kick User\n");
+        printf("(Y): Clear Reports | (L): Clear Messages\n");
+        printf("(R): Clear Kicks (Unban All)\n");
         printf("--------------------------------------------------\n");
         if (reportList.empty()) {
             printf("No active reports.\n");
@@ -252,6 +274,7 @@ int main(int argc, char **argv) {
         hidScanInput();
         u32 kDown = hidKeysDown();
 
+        // START beendet IMMER die App (3DSX beenden)
         if (kDown & KEY_START) break;
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
@@ -290,6 +313,31 @@ int main(int argc, char **argv) {
                 showAdminPanel = !showAdminPanel;
                 if(showAdminPanel) fetch_reports();
                 redraw_screen();
+            }
+
+            // ADMIN AKTIONEN IM ADMIN-PANEL
+            if (showAdminPanel && isAdmin) {
+                // ALLE MELDUNGEN LÖSCHEN (Y)
+                if (kDown & KEY_Y) {
+                    firebase_delete("reports");
+                    fetch_reports();
+                    redraw_screen();
+                }
+
+                // ALLE MESSAGES LÖSCHEN (L-Taste)
+                if (kDown & KEY_L) {
+                    firebase_delete("messages");
+                    firebase_post("messages", "{\"user\":\"System\",\"text\":\"All messages cleared by Admin!\"}");
+                    fetch_messages();
+                    redraw_screen();
+                }
+
+                // ALLE KICK-DATEN LÖSCHEN (R-Taste)
+                if (kDown & KEY_R) {
+                    firebase_delete("kicks");
+                    firebase_post("messages", "{\"user\":\"System\",\"text\":\"All kick data cleared by Admin!\"}");
+                    redraw_screen();
+                }
             }
 
             // NACHRICHT SENDEN / KICKEN (X)
@@ -340,7 +388,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // REPORT SENDEN (Y)
+            // REPORT SENDEN (Y - Nur im Chat-Modus)
             if ((kDown & KEY_Y) && !messageList.empty() && strlen(username) > 0 && !showAdminPanel) {
                 ChatMessage selected = messageList[selectedMsgIndex];
                 char reason[128] = "";
