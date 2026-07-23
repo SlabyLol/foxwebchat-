@@ -14,13 +14,14 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Fix pacman 403 Forbidden (Custom User-Agent)
+      - name: Fix devkitPro 403 Forbidden Error
         run: |
-          echo 'XferCommand = /usr/bin/wget --user-agent="Mozilla/5.0" --passive-ftp -c -O %o %u' >> /etc/pacman.conf
+          sed -i 's/#XferCommand = \/usr\/bin\/curl/XferCommand = \/usr\/bin\/curl -A "Mozilla\/5.0 (X11; Linux x86_64)" -L -C - -f -o %o %u/' /etc/pacman.conf
+          dkp-pacman -Syy
 
       - name: Install dependencies & Tools
         run: |
-          dkp-pacman -Sy --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build Bannertool
         run: |
