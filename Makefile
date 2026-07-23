@@ -14,7 +14,10 @@ LIBDIRS         := -L$(DEVKITPRO)/libctru/lib -L$(DEVKITPRO)/portlibs/3ds/lib
 ARCH            := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS          := -g -Wall -O2 -mword-relocations $(ARCH) $(INCLUDES)
 CXXFLAGS        := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
-LIBS            := -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lctru -lm
+
+# LDFLAGS mit 3DSX Specs ist der Schlüssel gegen den Linker-Fehler!
+LDFLAGS         := -specs=3dsx.specs $(ARCH) $(LIBDIRS)
+LIBS            := -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lz -lctru -lm
 
 .PHONY: all clean
 
@@ -26,7 +29,7 @@ $(TARGET).3dsx: $(TARGET).elf
 
 $(TARGET).elf:
 	@mkdir -p $(BUILD)
-	@$(CXX) $(CXXFLAGS) $(SOURCES)/main.cpp $(LIBDIRS) $(LIBS) -o $(BUILD)/$(TARGET).elf
+	@$(CXX) $(CXXFLAGS) $(SOURCES)/main.cpp $(LDFLAGS) $(LIBS) -o $(BUILD)/$(TARGET).elf
 
 clean:
 	@rm -rf $(BUILD) $(TARGET).3dsx
