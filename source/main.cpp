@@ -274,7 +274,6 @@ int main(int argc, char **argv) {
         hidScanInput();
         u32 kDown = hidKeysDown();
 
-        // START beendet IMMER die App (3DSX beenden)
         if (kDown & KEY_START) break;
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
@@ -317,14 +316,12 @@ int main(int argc, char **argv) {
 
             // ADMIN AKTIONEN IM ADMIN-PANEL
             if (showAdminPanel && isAdmin) {
-                // ALLE MELDUNGEN LÖSCHEN (Y)
                 if (kDown & KEY_Y) {
                     firebase_delete("reports");
                     fetch_reports();
                     redraw_screen();
                 }
 
-                // ALLE MESSAGES LÖSCHEN (L-Taste)
                 if (kDown & KEY_L) {
                     firebase_delete("messages");
                     firebase_post("messages", "{\"user\":\"System\",\"text\":\"All messages cleared by Admin!\"}");
@@ -332,7 +329,6 @@ int main(int argc, char **argv) {
                     redraw_screen();
                 }
 
-                // ALLE KICK-DATEN LÖSCHEN (R-Taste)
                 if (kDown & KEY_R) {
                     firebase_delete("kicks");
                     firebase_post("messages", "{\"user\":\"System\",\"text\":\"All kick data cleared by Admin!\"}");
@@ -388,14 +384,29 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // REPORT SENDEN (Y - Nur im Chat-Modus)
+            // REPORT SENDEN (Y - Mit Uno Reverse Schutz für den Admin)
             if ((kDown & KEY_Y) && !messageList.empty() && strlen(username) > 0 && !showAdminPanel) {
                 ChatMessage selected = messageList[selectedMsgIndex];
                 char reason[128] = "";
                 open_keyboard(reason, sizeof(reason), "Report Reason...");
+                
                 if (strlen(reason) > 0) {
                     char reportPayload[512];
-                    snprintf(reportPayload, sizeof(reportPayload), "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}", selected.user.c_str(), selected.text.c_str(), reason, username);
+                    
+                    // Schützt den Admin: Melder wird selbst gemeldet!
+                    if (selected.user == "ADMIN") {
+                        char customReason[256];
+                        snprintf(customReason, sizeof(customReason), "[UNO REVERSE] Tried to report Admin! Reason: %s", reason);
+                        
+                        snprintf(reportPayload, sizeof(reportPayload), 
+                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}", 
+                            username, selected.text.c_str(), customReason, username);
+                    } else {
+                        snprintf(reportPayload, sizeof(reportPayload), 
+                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}", 
+                            selected.user.c_str(), selected.text.c_str(), reason, username);
+                    }
+                    
                     firebase_post("reports", reportPayload);
                 }
                 redraw_screen();
