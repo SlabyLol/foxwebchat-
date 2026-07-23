@@ -6,39 +6,48 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest		#The process should run on Ubuntu
+    runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitarm	#Using the DevKitPro DevKitARM container
+      image: devkitpro/devkitarm
     steps:
     - name: Checkout repo
-      uses: actions/checkout@v4		#Use Checkout Version 4
-    - name: Build BannerTool		#In order to make a CIA file you need BannerTool and Makerom
-      continue-on-error: true		#For debbuging, can be removed
+      uses: actions/checkout@v4
+
+    - name: Fix devkitPro 403 Forbidden Error
+      run: |
+        sed -i 's/#XferCommand = \/usr\/bin\/curl/XferCommand = \/usr\/bin\/curl -A "Mozilla\/5.0 (X11; Linux x86_64)" -L -C - -f -o %o %u/' /etc/pacman.conf
+        dkp-pacman -Syy
+
+    - name: Build BannerTool
+      continue-on-error: true
       run: |
         git clone https://github.com/carstene1ns/3ds-bannertool.git
         cd 3ds-bannertool
         cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
         cmake --build build
-        sudo cmake --install build
-    - name: Build Makerom		#In order to make a CIA file you need BannerTool and Makerom
-      continue-on-error: true		#For debbuging, can be removed
+        cmake --install build
+        cd .. && rm -rf 3ds-bannertool
+
+    - name: Build Makerom
+      continue-on-error: true
       run: |
         git clone --recursive https://github.com/3DSGuy/Project_CTR
         cd Project_CTR/makerom
         make deps
         make
-        sudo cp ./bin/makerom /usr/local/bin/makerom	#The makerom executable should be
-        sudo chmod +x /usr/local/bin/makerom		#copied to bin folder and add exe attribute
-        cd ..
-        cd ..
-    - name: Build CIA			#Build the code
+        cp ./bin/makerom /usr/local/bin/makerom
+        chmod +x /usr/local/bin/makerom
+        cd ../.. && rm -rf Project_CTR
+
+    - name: Build CIA
       continue-on-error: true
       working-directory: .
       run: | 
-        sudo dkp-pacman -S --noconfirm 3dstools	tex3ds #if any other package is requiered can be installed
-        make
+        dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+        make cia
+
     - name: Upload CIA
-      uses: actions/upload-artifact@v4	#Upload the artifacts using the 3dsx and the cia files
+      uses: actions/upload-artifact@v4
       with:
           name: FoxWebChat
           path: | 
