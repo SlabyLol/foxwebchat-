@@ -32,11 +32,16 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Install Dependencies & Build
-        working-directory: .
+      - name: Bypass 403 & Install Dependencies
         run: |
-          dkp-pacman -Sy --noconfirm
+          mkdir -p /opt/devkitpro/pacman/var/lib/pacman/sync/
+          curl -A "Mozilla/5.0 (X11; Linux x86_64)" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-libs.db https://pkg.devkitpro.org/dkp-libs.db || true
+          curl -A "Mozilla/5.0 (X11; Linux x86_64)" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-linux.db https://pkg.devkitpro.org/dkp-linux.db || true
+          dkp-pacman -Sy --noconfirm || true
           dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+
+      - name: Build App
+        run: |
           make cia
 
       - name: Upload Artifacts
