@@ -36,12 +36,13 @@ jobs:
           name: FoxWebChat-3DSX-Build
           path: FoxWebChat.3dsx
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Create or Update GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           files: FoxWebChat.3dsx
-          name: FoxWebChat 3DSX ${{ github.ref_name }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('FoxWebChat 3DSX {0}', github.ref_name) || 'FoxWebChat 3DSX (Latest Build)' }}
           draft: false
           prerelease: false
         env:
