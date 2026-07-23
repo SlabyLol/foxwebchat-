@@ -32,14 +32,14 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Install 3DS Dependencies & Build CIA
+      - name: Install Dependencies & Build
         working-directory: .
         run: |
-          dkp-pacman -Sy --noconfirm --backend curl || dkp-pacman -Sy --noconfirm
-          dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds || true
+          dkp-pacman -Sy --noconfirm
+          dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
           make cia
 
-      - name: Upload CIA & 3DSX
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: FoxWebChat
