@@ -1,0 +1,29 @@
+BasicInfo:
+  Title                   : FoxWebChat 3DS
+  CompanyCode             : "00"
+  ProductCode             : FOX-WEBCHAT
+  ContentType             : Application
+  Logo                    : Nintendo
+
+TitleInfo:
+  UniqueId                : 0xf0x11
+  Category                : Application
+
+Option:
+  UseOnSD                 : True
+  EnableGpuDma            : True
+  FreeProductCode         : True
+  MediaFootPadding        : True
+  EnableL2Cache           : True
+
+AccessControlInfo:
+  CoreVersion             : 2
+  UseExtSaveData          : False
+  MemoryType              : Application
+  SystemMode              : 64MB
+
+  ServiceAccessControl:
+    - APT:U
+    - ncd:s
+    - AC:U
+    - soc:U
