@@ -7,18 +7,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Setup devkitPRO
-        uses: devkitPro/setup-devkitpro@v1
-        with:
-          3ds: true
+      - name: Fix pacman 403 Forbidden (Custom User-Agent)
+        run: |
+          echo 'XferCommand = /usr/bin/wget --user-agent="Mozilla/5.0" --passive-ftp -c -O %o %u' >> /etc/pacman.conf
 
       - name: Install dependencies & Tools
         run: |
-          sudo dkp-pacman -Sy --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          dkp-pacman -Sy --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build Bannertool
         run: |
@@ -26,7 +28,7 @@ jobs:
           cd 3ds-bannertool
           cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
           cmake --build build
-          sudo cmake --install build
+          cmake --install build
           cd .. && rm -rf 3ds-bannertool
 
       - name: Build Makerom
@@ -35,13 +37,12 @@ jobs:
           cd Project_CTR/makerom
           make deps
           make
-          sudo cp ./bin/makerom /usr/local/bin/makerom
-          sudo chmod +x /usr/local/bin/makerom
+          cp ./bin/makerom /usr/local/bin/makerom
+          chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
       - name: Build App (3DSX & CIA)
         run: |
-          source /etc/profile.d/devkit-env.sh
           make cia
 
       - name: Upload Artifacts
