@@ -38,7 +38,6 @@ static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *use
     return size * nmemb;
 }
 
-// HTTP Helper mit Timeouts (verhindert langes Einfrieren)
 std::string firebase_get(const char* path) {
     CURL *curl = curl_easy_init();
     std::string readBuffer = "";
@@ -50,7 +49,7 @@ std::string firebase_get(const char* path) {
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L); // Max 3s Timeout
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
         
         curl_easy_perform(curl);
@@ -112,34 +111,47 @@ void check_kick_status() {
     }
 }
 
-// Nachricht-Parsing
+// Hilfsfunktion: String zwischen zwei Anführungszeichen lesen
+std::string parse_json_value(const std::string& block, const std::string& key) {
+    size_t keyPos = block.find("\"" + key + "\"");
+    if (keyPos == std::string::npos) return "Unknown";
+    
+    size_t colonPos = block.find(":", keyPos);
+    if (colonPos == std::string::npos) return "Unknown";
+
+    size_t startQuote = block.find("\"", colonPos);
+    if (startQuote == std::string::npos) return "Unknown";
+
+    size_t endQuote = block.find("\"", startQuote + 1);
+    if (endQuote == std::string::npos) return "Unknown";
+
+    return block.substr(startQuote + 1, endQuote - startQuote - 1);
+}
+
+// Nachrichten zuverlässig parsen
 void fetch_messages() {
     std::string json = firebase_get("messages");
     if(json.empty() || json == "null") return;
 
     messageList.clear();
+    
     size_t pos = 0;
-    while((pos = json.find("\"text\"", pos)) != std::string::npos) {
-        size_t valStart = json.find(":", pos) + 1;
-        size_t strStart = json.find("\"", valStart) + 1;
-        size_t strEnd = json.find("\"", strStart);
-        std::string text = json.substr(strStart, strEnd - strStart);
+    while ((pos = json.find("{", pos)) != std::string::npos) {
+        size_t endPos = json.find("}", pos);
+        if (endPos == std::string::npos) break;
 
-        std::string user = "Unknown";
-        size_t userPos = json.rfind("\"user\"", pos);
-        if(userPos != std::string::npos) {
-            size_t uValStart = json.find(":", userPos) + 1;
-            size_t uStrStart = json.find("\"", uValStart) + 1;
-            size_t uStrEnd = json.find("\"", uStrStart);
-            user = json.substr(uStrStart, uStrEnd - uStrStart);
+        std::string block = json.substr(pos, endPos - pos + 1);
+        std::string text = parse_json_value(block, "text");
+        std::string user = parse_json_value(block, "user");
+
+        if (text != "Unknown") {
+            messageList.push_back({user, text});
         }
-
-        messageList.push_back({user, text});
-        pos = strEnd + 1;
+        pos = endPos + 1;
     }
 }
 
-// Report-Parsing (Verlässliche Extraktion)
+// Reports parsen
 void fetch_reports() {
     if(!isAdmin) return;
     std::string json = firebase_get("reports");
@@ -150,29 +162,19 @@ void fetch_reports() {
 
     reportList.clear();
     size_t pos = 0;
-    while((pos = json.find("\"reportedUser\"", pos)) != std::string::npos) {
-        size_t uStart = json.find("\"", json.find(":", pos)) + 1;
-        size_t uEnd = json.find("\"", uStart);
-        std::string user = json.substr(uStart, uEnd - uStart);
+    while ((pos = json.find("{", pos)) != std::string::npos) {
+        size_t endPos = json.find("}", pos);
+        if (endPos == std::string::npos) break;
 
-        std::string text = "N/A";
-        size_t tPos = json.find("\"messageText\"", pos);
-        if(tPos != std::string::npos) {
-            size_t tStart = json.find("\"", json.find(":", tPos)) + 1;
-            size_t tEnd = json.find("\"", tStart);
-            text = json.substr(tStart, tEnd - tStart);
+        std::string block = json.substr(pos, endPos - pos + 1);
+        std::string user = parse_json_value(block, "reportedUser");
+        std::string text = parse_json_value(block, "messageText");
+        std::string reason = parse_json_value(block, "reason");
+
+        if (user != "Unknown") {
+            reportList.push_back({user, text, reason});
         }
-
-        std::string reason = "No Reason";
-        size_t rPos = json.find("\"reason\"", pos);
-        if(rPos != std::string::npos) {
-            size_t rStart = json.find("\"", json.find(":", rPos)) + 1;
-            size_t rEnd = json.find("\"", rStart);
-            reason = json.substr(rStart, rEnd - rStart);
-        }
-
-        reportList.push_back({user, text, reason});
-        pos = uEnd + 1;
+        pos = endPos + 1;
     }
 }
 
@@ -187,7 +189,7 @@ void redraw_screen() {
     consoleClear();
     
     if (isKicked) {
-        printf("\x1b[16;3H\x1b[31mYou have been kicked by an Admin!\x1b[0m\n");
+        printf("\x1b[16;3H\x1b[31;1mYou have been kicked by an Admin!\x1b[0m\n");
         printf("\x1b[18;3HReason: %s\n", kickReason);
         return;
     }
@@ -201,7 +203,7 @@ void redraw_screen() {
     }
 
     if (showAdminPanel) {
-        printf("\x1b[31m=== ADMIN PANEL ===\x1b[0m\n");
+        printf("\x1b[31;1m=== ADMIN PANEL ===\x1b[0m\n");
         printf("(B): Close | (X): Kick Selected User\n");
         printf("--------------------------------------------------\n");
         if (reportList.empty()) {
@@ -209,7 +211,7 @@ void redraw_screen() {
         } else {
             for(size_t i = 0; i < reportList.size(); i++) {
                 if((int)i == selectedReportIndex) {
-                    printf("\x1b[31m> [%s]: \"%s\" (Reason: %s)\x1b[0m\n", 
+                    printf("\x1b[36;1m> [%s]: \"%s\" (Reason: %s)\x1b[0m\n", 
                         reportList[i].user.c_str(), reportList[i].text.c_str(), reportList[i].reason.c_str());
                 } else {
                     printf("  [%s]: \"%s\" (Reason: %s)\n", 
@@ -223,7 +225,7 @@ void redraw_screen() {
     printf("D-Pad [UP/DOWN]: Select Message\n");
     printf("(X): Send Message | (Y): Report Message\n");
     if (isAdmin) {
-        printf("\x1b[33m(B): Admin Panel\x1b[0m\n");
+        printf("\x1b[33;1m(B): Admin Panel\x1b[0m\n");
     }
     printf("--------------------------------------------------\n");
 
@@ -232,7 +234,8 @@ void redraw_screen() {
     } else {
         for (size_t i = 0; i < messageList.size(); i++) {
             if ((int)i == selectedMsgIndex) {
-                printf("\x1b[32m> [%s]: %s\x1b[0m\n", messageList[i].user.c_str(), messageList[i].text.c_str());
+                // Helles Cyan (\x1b[36;1m) für gute Lesbarkeit auf dem 3DS
+                printf("\x1b[36;1m> [%s]: %s\x1b[0m\n", messageList[i].user.c_str(), messageList[i].text.c_str());
             } else {
                 printf("  [%s]: %s\n", messageList[i].user.c_str(), messageList[i].text.c_str());
             }
@@ -256,7 +259,6 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        // Sync alle 5 Sekunden (Verhindert Lagging)
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
             check_kick_status();
             fetch_messages();
