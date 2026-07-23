@@ -22,6 +22,8 @@ ARCH            := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 # Header & Library Search Paths
 CFLAGS          := -Wall -O2 -mword-relocations $(ARCH) -I$(PORTLIBS)/include -I$(CTRULIB)/include
 CXXFLAGS        := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
+
+# LDFLAGS: Verwende g++ für den Linker (specs=3dsx.specs leitet die CFLAGS korrekt weiter)
 LDFLAGS         := -specs=3dsx.specs $(ARCH) -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
 
 # Order is critical: curl requires crypto/ssl libs, ctru must be at the end
