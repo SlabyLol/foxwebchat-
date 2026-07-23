@@ -17,14 +17,15 @@ APP_AUTHOR      := DarkFox Co.
 PORTLIBS        := $(DEVKITPRO)/portlibs/3ds
 CTRULIB         := $(DEVKITPRO)/libctru
 
-# Compiler & Linker Compiler Driver
+# Target-Architektur
 ARCH            := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
+# Compiler Flags
 CFLAGS          := -Wall -O2 -mword-relocations $(ARCH) -I$(PORTLIBS)/include -I$(CTRULIB)/include
 CXXFLAGS        := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 
-# Force linking via g++ driver instead of raw ld
-LD              := $(CXX)
+# Direct devkitARM rules to use arm-none-eabi-gcc/g++ frontend for linking
+LD              := $(PREFIX)g++
 LDFLAGS         := -specs=3dsx.specs $(ARCH) -L$(PORTLIBS)/lib -L$(CTRULIB)/lib
 
 # Libraries
