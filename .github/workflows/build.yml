@@ -1,4 +1,4 @@
-name: Build FoxWebChat 3DS CIA
+name: Build FoxWebChat 3DSX
 
 on:
   push:
@@ -19,16 +19,15 @@ jobs:
         run: |
           dkp-pacman -Sy --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls
 
-      - name: Build Project
+      - name: Build Project (.3dsx)
         shell: bash
         run: |
           . /etc/profile.d/devkit-env.sh
           make
 
-      - name: Upload CIA Artifact
+      - name: Upload 3DSX Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FoxWebChat-3DS-Build
+          name: FoxWebChat-3DSX-Build
           path: |
-            *.cia
             *.3dsx
