@@ -1,34 +1,32 @@
-name: Build 3DSX
+name: FoxWebChat 3DSX Build
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "dev" ]
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-3dsx:
+    name: Build FoxWebChat .3dsx
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitarm:latest
+      image: devkitpro/devkitarm
+      options: --user 1001
 
     steps:
-      - name: Checkout Code
+      - name: Repository auschecken
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-      - name: Build and Install libctru from source
-        run: |
-          rm -rf /opt/devkitpro/libctru
-          git clone https://github.com/devkitPro/libctru.git /opt/devkitpro/libctru
-          cd /opt/devkitpro/libctru && make -j$(nproc) && make install
+      - name: .3dsx kompilieren
+        run: make -j$(nproc --all)
 
-      - name: Compile 3DSX Target
-        run: |
-          make 3dsx -j$(nproc)
-
-      - name: Upload Build Artifacts
+      - name: .3dsx Artefakt hochladen
         uses: actions/upload-artifact@v4
         with:
-          name: foxwebchat-3dsx-build
-          path: |
-            *.3dsx
+          name: foxwebchat-3dsx
+          path: "*.3dsx"
