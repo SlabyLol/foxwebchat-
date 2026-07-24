@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkitarm
-      options: --user 1001
 
     steps:
       - name: Repository auschecken
