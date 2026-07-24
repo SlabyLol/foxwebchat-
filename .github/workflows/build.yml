@@ -2,7 +2,9 @@ name: Build FoxWebChat
 
 on:
   push:
-    branches: [main, master]
+    branches:
+      - main
+      - master
   pull_request:
   workflow_dispatch:
 
@@ -11,21 +13,47 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: devkitpro/devkitarm:latest
+      image: devkitpro/devkitpro:latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update package database
+        run: |
+          dkp-pacman -Syu --noconfirm
+
+      - name: Install 3DS toolchain
+        run: |
+          dkp-pacman -S --noconfirm \
+            devkitARM \
+            libctru \
+            citro2d \
+            citro3d \
+            3ds-portlibs
+
+      - name: Show environment
+        run: |
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "DEVKITARM=$DEVKITARM"
+          ls -la $DEVKITPRO
 
       - name: Build
         run: |
           make clean
           make -j$(nproc)
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
         with:
           name: FoxWebChat
+          if-no-files-found: warn
           path: |
             *.3dsx
             *.cia
             *.elf
             *.3ds
+            *.smdh
+            build/**/*.3dsx
+            build/**/*.cia
+            build/**/*.elf
