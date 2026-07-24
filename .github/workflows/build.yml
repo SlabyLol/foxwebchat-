@@ -47,8 +47,9 @@ jobs:
           # 3. Pacman-Datenbanken synchronisieren
           dkp-pacman -Sy --noconfirm --config "$PACCONF" || true
 
-          # 4. libctru, 3ds-dev und alle benötigten Bibliotheken installieren
-          dkp-pacman -S --noconfirm libctru 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          # 4. Essenzielle 3DS-Header und Tools installieren
+          dkp-pacman -S --noconfirm 3ds-dev libctru 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          
       - name: Build App
         run: |
           make cia
