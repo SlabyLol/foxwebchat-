@@ -1,39 +1,43 @@
-name: FoxWebChat 3DSX Build
+name: Build FoxWebChat
 
 on:
   push:
-    branches: [ "main", "master", "dev" ]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
-  build-3dsx:
-    name: Build FoxWebChat .3dsx
+  build:
     runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkitarm
 
-    env:
-      DEVKITPRO: /opt/devkitpro
-      DEVKITARM: /opt/devkitpro/devkitARM
+    container:
+      image: devkitpro/devkitarm:latest
 
     steps:
-      - name: Repository auschecken
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
-          fetch-depth: 0
 
-      - name: 3DS Bibliotheken und Regeln installieren (3ds-dev & libctru)
+      - name: Install libctru
         run: |
-          dkp-pacman -Syu --noconfirm 3ds-dev libctru
+          rm -rf /opt/devkitpro/libctru
+          git clone --depth=1 https://github.com/devkitPro/libctru.git /tmp/libctru
+          cd /tmp/libctru
+          make -j$(nproc)
+          make install
 
-      - name: .3dsx kompilieren
-        run: make -j$(nproc --all)
+      - name: Build
+        run: |
+          make clean
+          make 3dsx -j$(nproc)
 
-      - name: .3dsx Artefakt hochladen
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: foxwebchat-3dsx
-          path: "*.3dsx"
+          name: FoxWebChat
+          if-no-files-found: error
+          path: |
+            *.3dsx
+            *.smdh
+            *.elf
