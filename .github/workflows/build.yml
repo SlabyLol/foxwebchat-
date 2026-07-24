@@ -16,13 +16,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install libctru and 3ds_rules from source
+      - name: Build and Install libctru from source
         run: |
           rm -rf /opt/devkitpro/libctru
           git clone https://github.com/devkitPro/libctru.git /opt/devkitpro/libctru
           cd /opt/devkitpro/libctru
-          make
-          make install
+          
+          if [ -f "CMakeLists.txt" ]; then
+            mkdir build && cd build
+            cmake .. -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/3ds.cmake
+            make -j$(nproc)
+            make install
+          else
+            make -j$(nproc)
+            make install
+          fi
 
       - name: Compile 3DSX Target
         run: |
