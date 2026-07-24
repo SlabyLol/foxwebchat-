@@ -9,6 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: devkitpro/devkitarm
+
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -36,22 +41,20 @@ jobs:
         run: |
           PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
-          # 1. Signaturen deaktivieren
+          # 1. Signaturprüfung deaktivieren
           sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
           sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
-          # 2. Keyring re-init
+          # 2. Keyring initialisieren
           dkp-pacman-key --init || true
           dkp-pacman-key --populate devkitpro || true
 
-          # 3. Datenbanken synchronisieren und Toolchain erzwungen installieren
+          # 3. Pacman Datenbanken aktualisieren & 3DS SDK + libctru installieren
           dkp-pacman -Sy --noconfirm --config "$PACCONF"
-          dkp-pacman -S --noconfirm --needed 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          dkp-pacman -S --noconfirm libctru 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
         run: |
-          # POSIX-konformes Einbinden der devkitPro Umgebungsvariablen
-          . /etc/profile.d/devkit-env.sh
           make cia
 
       - name: Upload Artifacts
