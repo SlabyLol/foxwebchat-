@@ -22,6 +22,10 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
+      - name: 3DS Bibliotheken installieren (3ds-dev)
+        run: |
+          dkp-pacman -Syu --noconfirm 3ds-dev
+
       - name: .3dsx kompilieren
         run: make -j$(nproc --all)
 
