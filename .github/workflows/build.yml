@@ -1,131 +1,43 @@
-name: Build FoxWebChat
+name: Build 3DSX
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    env:
-      DEVKITPRO: /opt/devkitpro
-      DEVKITARM: /opt/devkitpro/devkitARM
+    container:
+      image: devkitpro/devkitarm:latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install devkitPro
+      - name: Install required devkitPro packages (curl, mbedtls, zlib, tools)
         run: |
-          sudo apt-get update
+          export DEVKITPRO=/opt/devkitpro
+          export PATH=$DEVKITPRO/tools/bin:$PATH
+          dkp-pacman -Sy --noconfirm 3ds-curl 3ds-mbedtls 3ds-zlib 3dstools general-tools
 
-          sudo mkdir -p /usr/local/share/keyrings
-          curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg | \
-            sudo gpg --dearmor -o /usr/local/share/keyrings/devkitpro.gpg
-
-          echo "deb [signed-by=/usr/local/share/keyrings/devkitpro.gpg] https://apt.devkitpro.org stable main" | \
-            sudo tee /etc/apt/sources.list.d/devkitpro.list
-
-          sudo apt-get update
-
-          sudo apt-get install -y \
-            devkitpro-pacman
-
-          sudo dkp-pacman -Syu --noconfirm
-
-          sudo dkp-pacman -S --noconfirm \
-            3ds-dev \
-            3ds-portlibs
-
-      - name: Verify installation
+      - name: Build and Install libctru from source
         run: |
-          echo "DEVKITPRO=$DEVKITPRO"
-          echo "DEVKITARM=$DEVKITARM"
+          rm -rf /opt/devkitpro/libctru
+          git clone https://github.com/devkitPro/libctru.git /opt/devkitpro/libctru
+          cd /opt/devkitpro/libctru && make -j$(nproc) && make install
 
-          ls -la /opt/devkitpro
-          find /opt/devkitpro -name 3ds_rules
-
-      - name: Build
+      - name: Compile 3DSX Target
         run: |
-          make clean
-          make
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=$DEVKITPRO/devkitARM
+          export PATH=$DEVKITPRO/tools/bin:$PATH
+          make 3dsx -j$(nproc)
 
-      - name: Upload artifacts
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FoxWebChat
-          if-no-files-found: error
+          name: foxwebchat-3dsx-build
           path: |
             *.3dsx
-            *.elf
-            *.cia
-            *.smdhname: Build FoxWebChat
-
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    env:
-      DEVKITPRO: /opt/devkitpro
-      DEVKITARM: /opt/devkitpro/devkitARM
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install devkitPro
-        run: |
-          sudo apt-get update
-
-          sudo mkdir -p /usr/local/share/keyrings
-          curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg | \
-            sudo gpg --dearmor -o /usr/local/share/keyrings/devkitpro.gpg
-
-          echo "deb [signed-by=/usr/local/share/keyrings/devkitpro.gpg] https://apt.devkitpro.org stable main" | \
-            sudo tee /etc/apt/sources.list.d/devkitpro.list
-
-          sudo apt-get update
-
-          sudo apt-get install -y \
-            devkitpro-pacman
-
-          sudo dkp-pacman -Syu --noconfirm
-
-          sudo dkp-pacman -S --noconfirm \
-            3ds-dev \
-            3ds-portlibs
-
-      - name: Verify installation
-        run: |
-          echo "DEVKITPRO=$DEVKITPRO"
-          echo "DEVKITARM=$DEVKITARM"
-
-          ls -la /opt/devkitpro
-          find /opt/devkitpro -name 3ds_rules
-
-      - name: Build
-        run: |
-          make clean
-          make
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: FoxWebChat
-          if-no-files-found: error
-          path: |
-            *.3dsx
-            *.elf
-            *.cia
-            *.smdh
