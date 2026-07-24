@@ -8,11 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitarm
-
-    env:
-      DEVKITPRO: /opt/devkitpro
-      DEVKITARM: /opt/devkitpro/devkitARM
+      image: devkitpro/devkit3ds
 
     steps:
       - name: Checkout repo
@@ -37,31 +33,13 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Configure Pacman & Install 3DS SDK
+      - name: Install Additional Libraries
         run: |
-          set -e
-          PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
-
-          # 1. Alle alten/widersprüchlichen SigLevel-Zeilen komplett entfernen
-          sed -i '/SigLevel/d' "$PACCONF"
-
-          # 2. SigLevel = Never global in [options] erzwingen
-          sed -i '/\[options\]/a SigLevel = Never\nLocalFileSigLevel = Never' "$PACCONF"
-
-          # 3. Datenbanken synchronisieren & 3DS SDK + libctru installieren
-          dkp-pacman -Sy --noconfirm
-          dkp-pacman -S --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
-
-          # 4. Verifizieren, dass 3ds.h wirklich auf der Festplatte gelandet ist
-          if [ ! -f /opt/devkitpro/libctru/include/3ds.h ]; then
-            echo "FEHLER: libctru/include/3ds.h wurde nicht installiert!"
-            exit 1
-          fi
+          dkp-pacman -Sy --noconfirm --needed 3ds-curl 3ds-mbedtls 3ds-libpng
 
       - name: Build App
         run: |
-          . /etc/profile.d/devkit-env.sh
-          make cia DEVKITPRO=/opt/devkitpro DEVKITARM=/opt/devkitpro/devkitARM
+          make cia
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
