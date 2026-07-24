@@ -1,4 +1,4 @@
-name: Build 3DS CIA & 3DSX
+name: Build 3DSX
 
 on:
   push:
@@ -16,29 +16,17 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Compile ELF
+      - name: Install 3DS Dependencies
         run: |
-          make -j$(nproc)
+          dkp-pacman -Sy --noconfirm 3ds-dev 3ds-tools 3ds-curl 3ds-zlib 3ds-mbedtls || true
 
-      - name: Package with bannertool and makerom
+      - name: Compile 3DSX Target
         run: |
-          # 1. SMDH (Icon) generieren falls icon.png existiert, sonst Text-Fallback
-          if [ -f icon.png ]; then
-            bannertool makesmdh -s "FoxWebChat" -l "FoxWebChat" -p "DarkFox Co." -i icon.png -o icon.bin
-          else
-            bannertool makesmdh -s "FoxWebChat" -l "FoxWebChat" -p "DarkFox Co." -o icon.bin
-          fi
-
-          # 2. CIA bauen mit makerom
-          makerom -v -f cia -o foxwebchat.cia -exefslogo -elf foxwebchat.elf -icon icon.bin
-
-          # 3. 3DSX bauen
-          3dsxtool foxwebchat.elf foxwebchat.3dsx --smdh=icon.bin
+          make 3dsx -j$(nproc)
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: foxwebchat-3ds-build
+          name: foxwebchat-3dsx-build
           path: |
-            *.cia
             *.3dsx
