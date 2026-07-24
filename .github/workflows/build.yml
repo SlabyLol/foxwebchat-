@@ -32,19 +32,19 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Bypass 403 & Signature Check
+      - name: Bypass 403 & Force Disable Signatures
         run: |
-          # 1. PGP-Signaturprüfung für pacman deaktivieren
-          sed -i 's/SigLevel    = Required DatabaseOptional/SigLevel = Never/g' /opt/devkitpro/pacman/etc/pacman.conf || true
-          sed -i 's/LocalFileSigLevel = Optional/LocalFileSigLevel = Never/g' /opt/devkitpro/pacman/etc/pacman.conf || true
+          # 1. Signaturprüfung in JEDER pacman.conf deaktivieren (System & DevkitPro)
+          find / -name "pacman.conf" -exec sed -i 's/SigLevel.*/SigLevel = Never/g' {} + || true
+          find / -name "pacman.conf" -exec sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' {} + || true
 
-          # 2. Datenbanken direkt per curl mit User-Agent spiegeln
+          # 2. Sync-Verzeichnis vorbereiten und Datenbanken via curl spiegeln
           mkdir -p /opt/devkitpro/pacman/var/lib/pacman/sync/
           curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-libs.db https://pkg.devkitpro.org/dkp-libs.db
           curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-linux.db https://pkg.devkitpro.org/dkp-linux.db
 
-          # 3. Pakete installieren OHNE -y (kein neuer Sync-Versuch)
-          dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          # 3. Pakete ohne Sync und ohne Signaturprüfung installieren
+          dkp-pacman -S --noconfirm --siglevel Never 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
         run: |
