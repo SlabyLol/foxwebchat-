@@ -8,7 +8,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkit3ds
+      image: devkitpro/devkitarm
 
     steps:
       - name: Checkout repo
@@ -33,12 +33,25 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Install Additional Libraries
+      - name: Configure Pacman & Install 3DS SDK
         run: |
-          dkp-pacman -Sy --noconfirm --needed 3ds-curl 3ds-mbedtls 3ds-libpng
+          PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
+
+          # 1. Alle alten SigLevel-Einträge entfernen (verhindert Repo-Overrides)
+          sed -i '/SigLevel/d' "$PACCONF"
+
+          # 2. SigLevel = Never global in [options] setzen
+          sed -i '/\[options\]/a SigLevel = Never\nLocalFileSigLevel = Never' "$PACCONF"
+
+          # 3. Datenbanken erneuern & 3DS SDK (libctru) und Zusatz-Libs installieren
+          dkp-pacman -Syy --noconfirm
+          dkp-pacman -S --noconfirm --needed 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
         run: |
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=/opt/devkitpro/devkitARM
+          . /etc/profile.d/devkit-env.sh
           make cia
 
       - name: Upload Artifacts
