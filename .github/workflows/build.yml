@@ -32,24 +32,20 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Bypass 403 & Disable Signatures via Config
+      - name: Bypass 403 & Disable Database Signatures
         run: |
-          # 1. SigLevel in devkitpro pacman.conf überschreiben
-          CONF="/opt/devkitpro/pacman/etc/pacman.conf"
-          if [ -f "$CONF" ]; then
-            sed -i 's/SigLevel.*/SigLevel = Never/g' "$CONF"
-            sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$CONF"
-          fi
+          PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
-          # Fallback: Falls devkitpro eine globale pacman.conf nutzt
-          sed -i 's/SigLevel.*/SigLevel = Never/g' /etc/pacman.conf || true
+          # 1. Signaturprüfungen direkt in der devkitPro-Konfiguration deaktivieren
+          sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
+          sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
-          # 2. Sync-Verzeichnis erstellen & Datenbanken spiegeln
+          # 2. Sync-Ordner anlegen & Repositories via curl spiegeln
           mkdir -p /opt/devkitpro/pacman/var/lib/pacman/sync/
           curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-libs.db https://pkg.devkitpro.org/dkp-libs.db
           curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-linux.db https://pkg.devkitpro.org/dkp-linux.db
 
-          # 3. Pakete ohne Sync und ohne --siglevel CLI-Flag installieren
+          # 3. Paketinstallation durchführen
           dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
