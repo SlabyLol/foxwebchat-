@@ -16,17 +16,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install required devkitPro packages (curl, mbedtls, zlib, tools)
+      - name: Install/update required devkitPro packages
         run: |
           export DEVKITPRO=/opt/devkitpro
           export PATH=$DEVKITPRO/tools/bin:$PATH
-          dkp-pacman -Sy --noconfirm 3ds-curl 3ds-mbedtls 3ds-zlib 3dstools general-tools
-
-      - name: Build and Install libctru from source
-        run: |
-          rm -rf /opt/devkitpro/libctru
-          git clone https://github.com/devkitPro/libctru.git /opt/devkitpro/libctru
-          cd /opt/devkitpro/libctru && make -j$(nproc) && make install
+          dkp-pacman -Sy --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls 3ds-zlib 3dstools general-tools
 
       - name: Compile 3DSX Target
         run: |
