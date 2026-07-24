@@ -32,24 +32,23 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Fix Pacman Database & Signatures
+      - name: Fix Pacman Database & Install Dependencies
         run: |
           PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
-          # 1. Sämtliche Signaturprüfungen im Container deaktivieren
+          # 1. Signaturprüfungen im Container deaktivieren
           sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
           sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
-          # 2. Keyring initialisieren/populate, damit pacman lokale DBs als valide ansieht
+          # 2. Keyring initialisieren
           dkp-pacman-key --init || true
           dkp-pacman-key --populate devkitpro || true
 
-          # 3. Datenbanken synchronisieren mit custom User-Agent
+          # 3. Pacman-Datenbanken synchronisieren
           dkp-pacman -Sy --noconfirm --config "$PACCONF" || true
 
-          # 4. Pakete installieren
-          dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
-
+          # 4. libctru, 3ds-dev und alle benötigten Bibliotheken installieren
+          dkp-pacman -S --noconfirm libctru 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
       - name: Build App
         run: |
           make cia
