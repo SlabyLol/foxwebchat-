@@ -16,13 +16,15 @@ endif
 
 include $(DEVKITARM)/3ds_rules
 
+PORTLIBS_PATH ?= $(DEVKITPRO)/portlibs
+
 # Flags & Libraries
 ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS      := -Wall -O2 -mword-relocations $(ARCH)
 CXXFLAGS    := $(CFLAGS) -fno-rtti -fno-exceptions
 
 LIBS        := -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lz -lctru -lm
-LIBDIRS     := $(CTRULIB)
+LIBDIRS     := $(CTRULIB) $(PORTLIBS_PATH)/3ds $(PORTLIBS_PATH)/armv6k
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
@@ -73,7 +75,7 @@ CXXFLAGS += $(INCLUDE) -D__3DS__
 
 $(OUTPUT).elf: $(OFILES)
 	@echo linking $(notdir $@)
-	@$(CXX) $(ARCH) $(OFILES) -L$(LIBDIRS)/lib $(LIBS) -o $@
+	@$(CXX) $(ARCH) $(OFILES) $(foreach dir,$(LIBDIRS),-L$(dir)/lib) $(LIBS) -o $@
 
 -include $(DEPENDS)
 
