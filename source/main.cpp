@@ -10,6 +10,31 @@
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
 #define ADMIN_CODE "AdminJs93€=no"
 
+// ASCII/Unicode Fox Artwork
+const char* FOX_ART = R"(
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣆⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⢠⡀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⡄⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠈⣿⣦⣄⠀⠀⠀⠀⢠⣿⣿⣿⣿⡀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢹⣿⣿⣷⣤⣀⣠⣿⣿⠃⠸⣿⣧⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠈⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⣿⣿⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣤⣿⣿⣿⣿⣿⣿⣿⣿⣷⡀⢸⣿⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣿⣿⣿⣿⣛⣩⣽⣿⣿⣿⣷⣸⣿⠀⠀⠀⠀
+⠀⠀⠀⢀⣴⣿⣿⣿⡾⠿⠛⠛⠛⠛⠿⣿⣿⡿⠀⢰⡀⠀
+⢀⣠⣾⣿⠟⠋⠉⢀⣀⣤⣤⣶⣶⣶⣦⣾⣿⠇⠀⣾⣷⠀
+⠈⠙⠻⢷⣶⣴⡾⠿⠛⠉⠉⠀⠀⠈⣩⣿⠏⠀⣰⣿⣿⡄
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⠏⠀⣰⣿⢿⣿⡇
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⡿⠋⢀⾾⣿⠏⣾⣿⡇
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⣿⡿⠋⣠⣴⣿⠟⢁⣼⣿⣿⡇
+⠀⠀⠀⠀⠀⠀⠀⣴⡿⠟⢉⣤⣾⣿⠟⠁⣠⣿⣿⣿⣿⠀
+⠀⠀⠀⠀⠀⠀⠚⢉⣤⣶⣿⠿⠋⢀⣴⣾⣿⣿⣿⣿⠃⠀
+⠀⠀⠀⠀⠀⠀⣴⣿⡿⠋⢁⣤⣾⣿⣿⣿⣿⣿⡿⠃⠀⠀
+⠀⠀⠀⠀⠀⣼⣿⠋⠀⣴⣿⣿⣿⣿⣿⣿⡿⠏⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣿⠇⢀⣾⣿⣿⣿⣿⣿⠿⠋⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣿⠀⣼⣿⣿⣿⠿⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠱⠀⣿⡿⠛⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+)";
+
 struct ChatMessage {
     std::string user;
     std::string text;
@@ -32,6 +57,10 @@ std::vector<ReportItem> reportList;
 int selectedMsgIndex = 0;
 int selectedReportIndex = 0;
 u64 lastFetchTime = 0;
+
+// Dual-Console Objekte
+static PrintConsole topConsole;
+static PrintConsole bottomConsole;
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -197,7 +226,16 @@ void open_keyboard(char* out_text, size_t max_len, const char* hint) {
     swkbdInputText(&swkbd, out_text, max_len);
 }
 
+void draw_bottom_screen() {
+    consoleSelect(&bottomConsole);
+    consoleClear();
+    printf("%s\n", FOX_ART);
+    printf(" Web Edition:\n");
+    printf(" slabylol.github.io/foxwebchat-/\n");
+}
+
 void redraw_screen() {
+    consoleSelect(&topConsole);
     consoleClear();
     
     if (isKicked) {
@@ -262,12 +300,20 @@ void redraw_screen() {
 
 int main(int argc, char **argv) {
     gfxInitDefault();
-    consoleInit(GFX_TOP, NULL);
     
+    // Beide Bildschirme initialisieren
+    consoleInit(GFX_TOP, &topConsole);
+    consoleInit(GFX_BOTTOM, &bottomConsole);
+    
+    // Sockets & CURL initialisieren
     u32 *soc_buffer = (u32*)memalign(0x1000, 0x100000);
     if (soc_buffer != NULL) socInit(soc_buffer, 0x100000);
     curl_global_init(CURL_GLOBAL_ALL);
 
+    // Unteren Bildschirm zeichnen (Artwork + Link)
+    draw_bottom_screen();
+
+    // Oberen Bildschirm initialisieren
     redraw_screen();
 
     while (aptMainLoop()) {
