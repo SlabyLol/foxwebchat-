@@ -2,9 +2,7 @@ name: Build FoxWebChat
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -16,28 +14,18 @@ jobs:
       image: devkitpro/devkitarm:latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install libctru
-        run: |
-          rm -rf /opt/devkitpro/libctru
-          git clone --depth=1 https://github.com/devkitPro/libctru.git /tmp/libctru
-          cd /tmp/libctru
-          make -j$(nproc)
-          make install
+      - uses: actions/checkout@v4
 
       - name: Build
         run: |
           make clean
-          make 3dsx -j$(nproc)
+          make -j$(nproc)
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: FoxWebChat
-          if-no-files-found: error
           path: |
             *.3dsx
-            *.smdh
+            *.cia
             *.elf
+            *.3ds
