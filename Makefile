@@ -60,12 +60,16 @@ clean:
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 
-%.elf: $(BUILD)
+$(TARGET).elf: $(BUILD)
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR:/=)/Makefile
+	@cp $(BUILD)/$(TARGET).elf $(TARGET).elf 2>/dev/null || true
 
 else
 
 DEPENDS := $(OFILES:.o=.d)
+
+CFLAGS   += $(INCLUDE) -D__3DS__
+CXXFLAGS += $(INCLUDE) -D__3DS__
 
 $(OUTPUT).elf: $(OFILES)
 	@echo linking $(notdir $@)
