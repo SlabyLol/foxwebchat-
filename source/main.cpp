@@ -11,11 +11,12 @@
 #define ADMIN_CODE "AdminJs93€=no"
 
 // ASCII/Unicode Fox Artwork
-const char* FOX_ART = R"(
-  _,-=._              /|_/|
-  `-.}   `=._,.-=-._.,  @ @._,
-     `._ _,-.   )      _,.-'
-        `    G.m-"^m`m'       ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+const char* FOX_ART = R"(  _____ ____  ____  
+ |___ /|  _ \/ ___| 
+   |_ \| | | \___ \ 
+  ___) | |_| |___) |
+ |____/|____/|____/ 
+                         ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 )";
 
 struct ChatMessage {
