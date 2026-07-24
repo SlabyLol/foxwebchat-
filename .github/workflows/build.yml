@@ -14,6 +14,16 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Install 3DS SDK packages (libctru, citro3d, etc.)
+        run: |
+          # update pacman DB and install required 3DS SDK packages
+          dkp-pacman -Syy --noconfirm
+          dkp-pacman -S --noconfirm --needed libctru citro3d citro2d 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          # export env for later steps
+          echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
+          echo "DEVKITARM=/opt/devkitpro/devkitARM" >> $GITHUB_ENV
+          echo "/opt/devkitpro/devkitARM/bin" >> $GITHUB_PATH
+
       - name: Build BannerTool
         run: |
           git clone https://github.com/carstene1ns/3ds-bannertool.git
@@ -33,25 +43,11 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Configure Pacman & Install 3DS SDK
-        run: |
-          PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
-
-          # 1. Alle alten SigLevel-Einträge entfernen (verhindert Repo-Overrides)
-          sed -i '/SigLevel/d' "$PACCONF"
-
-          # 2. SigLevel = Never global in [options] setzen
-          sed -i '/\[options\]/a SigLevel = Never\nLocalFileSigLevel = Never' "$PACCONF"
-
-          # 3. Datenbanken erneuern & 3DS SDK (libctru) und Zusatz-Libs installieren
-          dkp-pacman -Syy --noconfirm
-          dkp-pacman -S --noconfirm --needed 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
-
       - name: Build App
         run: |
           export DEVKITPRO=/opt/devkitpro
           export DEVKITARM=/opt/devkitpro/devkitARM
-          . /etc/profile.d/devkit-env.sh
+          . /etc/profile.d/devkit-env.sh || true
           make cia
 
       - name: Upload Artifacts
