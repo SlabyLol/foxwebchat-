@@ -36,21 +36,21 @@ jobs:
         run: |
           PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
-          # 1. Signaturprüfungen im Container deaktivieren
           sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
           sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
-          # 2. Keyring initialisieren
           dkp-pacman-key --init || true
           dkp-pacman-key --populate devkitpro || true
 
-          # 3. Pacman-Datenbanken synchronisieren
           dkp-pacman -Sy --noconfirm --config "$PACCONF" || true
 
-          # 4. Essenzielle 3DS-Header und Tools installieren
-          dkp-pacman -S --noconfirm 3ds-dev libctru 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
-          
+          # Wichtig: 3ds-dev enthält libctru UND setzt die korrekten Dev-Pfade
+          dkp-pacman -S --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+
       - name: Build App
+        env:
+          DEVKITPRO: /opt/devkitpro
+          DEVKITARM: /opt/devkitpro/devkitARM
         run: |
           make cia
 
