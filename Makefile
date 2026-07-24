@@ -10,11 +10,11 @@ APP_AUTHOR  := DarkFox Co.
 APP_VERSION := 1.0.0
 
 # DevkitPro environment setup
-ifeq ($(strip $(DEVKITPRO)),)
-$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=/opt/devkitpro")
+ifeq ($(strip $(DEVKITARM)),)
+$(error "Please set DEVKITARM in your environment. export DEVKITARM=/opt/devkitpro/devkitARM")
 endif
 
-include $(DEVKITPRO)/3ds_rules
+include $(DEVKITARM)/3ds_rules
 
 # Flags & Libraries
 ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
