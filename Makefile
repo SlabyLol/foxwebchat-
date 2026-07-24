@@ -75,7 +75,7 @@ CXXFLAGS += $(INCLUDE) -D__3DS__
 
 $(OUTPUT).elf: $(OFILES)
 	@echo linking $(notdir $@)
-	@$(CXX) $(ARCH) $(OFILES) $(foreach dir,$(LIBDIRS),-L$(dir)/lib) $(LIBS) -o $@
+	@$(CXX) -specs=3dsx.specs $(ARCH) $(OFILES) $(foreach dir,$(LIBDIRS),-L$(dir)/lib) $(LIBS) -o $@
 
 -include $(DEPENDS)
 
