@@ -14,6 +14,10 @@ jobs:
     container:
       image: devkitpro/devkitarm
 
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
     steps:
       - name: Repository auschecken
         uses: actions/checkout@v4
@@ -21,9 +25,9 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: 3DS Bibliotheken installieren (3ds-dev)
+      - name: 3DS Bibliotheken und Regeln installieren (3ds-dev & libctru)
         run: |
-          dkp-pacman -Syu --noconfirm 3ds-dev
+          dkp-pacman -Syu --noconfirm 3ds-dev libctru
 
       - name: .3dsx kompilieren
         run: make -j$(nproc --all)
