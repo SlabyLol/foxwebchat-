@@ -1,61 +1,33 @@
-name: Build Nintendo 3DS CIA
+name: Build 3DS CIA & 3DSX
 
 on:
   push:
+    branches: [ "main", "master" ]
   pull_request:
+    branches: [ "main", "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: devkitpro/devkitarm
+      image: devkitpro/devkitarm:latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install 3DS SDK packages (libctru, citro3d, etc.)
+      - name: Install 3DS Dependencies
         run: |
-          # update pacman DB and install required 3DS SDK packages
-          dkp-pacman -Syy --noconfirm
-          dkp-pacman -S --noconfirm --needed libctru citro3d citro2d 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
-          # export env for later steps
-          echo "DEVKITPRO=/opt/devkitpro" >> $GITHUB_ENV
-          echo "DEVKITARM=/opt/devkitpro/devkitARM" >> $GITHUB_ENV
-          echo "/opt/devkitpro/devkitARM/bin" >> $GITHUB_PATH
+          dkp-pacman -Sy --noconfirm 3ds-dev 3ds-curl 3ds-zlib 3ds-mbedtls
 
-      - name: Build BannerTool
+      - name: Compile Target
         run: |
-          git clone https://github.com/carstene1ns/3ds-bannertool.git
-          cd 3ds-bannertool
-          cmake -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
-          cmake --build build
-          cmake --install build
-          cd .. && rm -rf 3ds-bannertool
+          make -j$(nproc)
 
-      - name: Build Makerom
-        run: |
-          git clone --recursive https://github.com/3DSGuy/Project_CTR
-          cd Project_CTR/makerom
-          make deps
-          make
-          cp ./bin/makerom /usr/local/bin/makerom
-          chmod +x /usr/local/bin/makerom
-          cd ../.. && rm -rf Project_CTR
-
-      - name: Build App
-        run: |
-          export DEVKITPRO=/opt/devkitpro
-          export DEVKITARM=/opt/devkitpro/devkitARM
-          . /etc/profile.d/devkit-env.sh || true
-          make cia
-
-      - name: Upload Artifacts
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: FoxWebChat
+          name: foxwebchat-3ds-build
           path: |
             *.cia
             *.3dsx
-            build/*.cia
-            build/*.3dsx
