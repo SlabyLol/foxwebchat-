@@ -1,0 +1,17 @@
+{
+	"github": "SlabyLol/foxwebchat-",
+	"author": "DarkFox Co.",
+	"systems": [
+		"3DS"
+	],
+	"categories": [
+		"app",
+		"utility"
+	],
+	"llm_generation": "no",
+	"icon": "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/refs/heads/main/resources/icon.png",
+	"image": "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/refs/heads/main/resources/banner.png",
+	"unique_ids": [],
+	"long_description": "An Public Chat for everyone!",
+	"preinstall_message": "!WARNING! BEING MEAN OR SPAMMING REPORT FOR NOTHING WILL RESULT IN A BAN!"
+}
