@@ -22,7 +22,7 @@ jobs:
           export PATH=$DEVKITPRO/tools/bin:$PATH
           dkp-pacman -Sy --needed --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls 3ds-zlib
           echo "Checking 3ds_rules exists:"
-          ls -la /opt/devkitpro/3ds_rules
+          ls -la /opt/devkitpro/devkitARM/3ds_rules
 
       - name: Compile 3DSX Target
         run: |
