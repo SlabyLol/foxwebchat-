@@ -32,26 +32,26 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Fix Pacman Database & Install Dependencies
+      - name: Install 3DS SDK & Dependencies
         run: |
           PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
+          # 1. Signaturen deaktivieren
           sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
           sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
+          # 2. Keyring re-init
           dkp-pacman-key --init || true
           dkp-pacman-key --populate devkitpro || true
 
-          dkp-pacman -Sy --noconfirm --config "$PACCONF" || true
-
-          # Wichtig: 3ds-dev enthält libctru UND setzt die korrekten Dev-Pfade
-          dkp-pacman -S --noconfirm 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
+          # 3. Datenbanken synchronisieren und Toolchain erzwungen installieren
+          dkp-pacman -Sy --noconfirm --config "$PACCONF"
+          dkp-pacman -S --noconfirm --needed 3ds-dev 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
-        env:
-          DEVKITPRO: /opt/devkitpro
-          DEVKITARM: /opt/devkitpro/devkitARM
         run: |
+          # POSIX-konformes Einbinden der devkitPro Umgebungsvariablen
+          . /etc/profile.d/devkit-env.sh
           make cia
 
       - name: Upload Artifacts
