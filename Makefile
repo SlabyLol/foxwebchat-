@@ -1,117 +1,76 @@
-#---------------------------------------------------------------------------------
-.SUFFIXES:
-#---------------------------------------------------------------------------------
+# Target settings
+TARGET      := foxwebchat
+BUILD       := build
+SOURCES     := source
+INCLUDES    := include
+ICON        := resources/icon.png
 
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
+APP_TITLE   := FoxWebChat
+APP_AUTHOR  := DarkFox Co.
+APP_VERSION := 1.0.0
+
+# DevkitPro environment setup
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=/opt/devkitpro")
 endif
 
-TOPDIR ?= $(CURDIR)
-include $(DEVKITARM)/3ds_rules
+include $(DEVKITPRO)/3ds_rules
 
-#---------------------------------------------------------------------------------
-# TARGET & METADATA
-#---------------------------------------------------------------------------------
-TARGET          := FoxWebChat
-BUILD           := build
-SOURCES         := source
-DATA            := data
-INCLUDES        := include
-ROMFS           := romfs
+# Flags & Libraries
+ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
+CFLAGS      := -Wall -O2 -mword-relocations $(ARCH)
+CXXFLAGS    := $(CFLAGS) -fno-rtti -fno-exceptions
 
-APP_TITLE       := FoxWebChat 3DS
-APP_DESCRIPTION := Firebase Chat App for Nintendo 3DS
-APP_AUTHOR      := DarkFox Co.
+LIBS        := -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lz -lctru -lm
+LIBDIRS     := $(CTRULIB)
 
-#---------------------------------------------------------------------------------
-# ARCHITECTURE & COMPILER FLAGS
-#---------------------------------------------------------------------------------
-ARCH            := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
-
-CFLAGS          := -g -Wall -O2 -mword-relocations -ffunction-sections $(ARCH) -D__3DS__
-CXXFLAGS        := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17 -Wno-psabi
-
-ASFLAGS         := -g $(ARCH)
-LDFLAGS         = -specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-
-LIBS            := -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lcitro2d -lcitro3d -lctru -lm
-
-#---------------------------------------------------------------------------------
-# LIBRARIES & DIRECTORIES
-#---------------------------------------------------------------------------------
-CTRULIB         ?= $(DEVKITPRO)/libctru
-PORTLIBS        ?= $(DEVKITPRO)/portlibs/3ds
-LIBDIRS         := $(CTRULIB) $(PORTLIBS)
-
-export INCLUDE  := $(foreach dir,$(INCLUDES),-I$(TOPDIR)/$(dir)) \
-                   $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-                   -I$(TOPDIR)/$(BUILD)
-
-#---------------------------------------------------------------------------------
 ifneq ($(BUILD),$(notdir $(CURDIR)))
-#---------------------------------------------------------------------------------
 
 export OUTPUT   := $(CURDIR)/$(TARGET)
-export TOPDIR   := $(CURDIR)
-
-export VPATH    := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-                   $(foreach dir,$(DATA),$(CURDIR)/$(dir))
-
+export VPATH    := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR  := $(CURDIR)/$(BUILD)
 
-CFILES          := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES        := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-SFILES          := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES        := $(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+CFILES      := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CPPFILES    := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 
-export LD       := $(CXX)
+export OFILES   := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o)
+export INCLUDE  := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+                   $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+                   -I$(CURDIR)/$(BUILD)
 
-export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-export OFILES_BIN     := $(addsuffix .o,$(BINFILES))
-export OFILES         := $(OFILES_BIN) $(OFILES_SOURCES)
+.PHONY: all clean 3dsx
 
-export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+all: 3dsx
 
-.PHONY: all clean cia bootstrap
+3dsx: $(TARGET).3dsx
 
-all: bootstrap $(BUILD)
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-
-cia: bootstrap $(BUILD)
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile $@
-
-bootstrap:
-	@mkdir -p $(BUILD)
-
-$(BUILD):
-	@mkdir -p $@
+$(TARGET).3dsx: $(TARGET).elf
+	@echo "Building $(TARGET).3dsx using resources icon..."
+	@if [ -f $(ICON) ]; then \
+		bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_TITLE)" -p "$(APP_AUTHOR)" -i $(ICON) -o icon.bin; \
+	else \
+		bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_TITLE)" -p "$(APP_AUTHOR)" -o icon.bin; \
+	fi
+	@3dsxtool $(TARGET).elf $(TARGET).3dsx --smdh=icon.bin
+	@rm -f icon.bin
 
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).3dsx $(TARGET).smdh $(TARGET).elf $(TARGET).cia icon.icn banner.bnr
+	@rm -rf $(BUILD) $(TARGET).3dsx $(TARGET).elf icon.bin
 
-#---------------------------------------------------------------------------------
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+
+%.elf: $(BUILD)
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR:/=)/Makefile
+
 else
-#---------------------------------------------------------------------------------
 
-.PHONY: all cia
+DEPENDS := $(OFILES:.o=.d)
 
-all: $(OUTPUT).3dsx $(OUTPUT).cia
+$(OUTPUT).elf: $(OFILES)
+	@echo linking $(notdir $@)
+	@$(CXX) $(ARCH) $(OFILES) -L$(LIBDIRS)/lib $(LIBS) -o $@
 
-cia: $(OUTPUT).cia
+-include $(DEPENDS)
 
-$(OUTPUT).3dsx : $(OUTPUT).elf
-
-$(OUTPUT).elf  : $(OFILES)
-
-$(OUTPUT).cia  : $(OUTPUT).elf
-	@bannertool makebanner -i $(TOPDIR)/resources/banner.png -o banner.bnr || true
-	@bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_DESCRIPTION)" -p "$(APP_AUTHOR)" -i $(TOPDIR)/resources/icon.png -o icon.icn || true
-	@makerom -f cia -o $(OUTPUT).cia -elf $(OUTPUT).elf -rsf $(TOPDIR)/app.rsf -icon icon.icn -banner banner.bnr || true
-	@echo "built ... $(notdir $@)"
-
--include $(DEPSDIR)/*.d
-
-#---------------------------------------------------------------------------------
 endif
-#---------------------------------------------------------------------------------
