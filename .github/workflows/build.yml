@@ -9,15 +9,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitarm:latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup devkitPro Environment
-        uses: devkitPro/actions/setup@v1
-        with:
-          packages: 3ds-dev 3ds-tools 3ds-curl 3ds-zlib 3ds-mbedtls
+      - name: Install libctru directly from source
+        run: |
+          git clone https://github.com/devkitPro/libctru.git /opt/devkitpro/libctru
+          cd /opt/devkitpro/libctru
+          make
 
       - name: Compile 3DSX Target
         run: |
