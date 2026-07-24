@@ -288,7 +288,7 @@ int main(int argc, char **argv) {
             // JOIN (A)
             if ((kDown & KEY_A) && strlen(username) == 0) {
                 char inputName[64] = "";
-                open_keyboard(inputName, sizeof(inputName), "Enter Name / Admin Code");
+                open_keyboard(inputName, sizeof(inputName), "Enter Name");
                 if (strlen(inputName) > 0) {
                     if (strcmp(inputName, ADMIN_CODE) == 0) {
                         isAdmin = true;
