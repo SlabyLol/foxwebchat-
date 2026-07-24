@@ -32,20 +32,26 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Bypass 403 & Disable Database Signatures
+      - name: Force Disable PGP Verification & Inject Databases
         run: |
           PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
-          # 1. Signaturprüfungen direkt in der devkitPro-Konfiguration deaktivieren
+          # 1. Ersetze die SigLevel-Zeilen global auf 'Never'
           sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
           sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
-          # 2. Sync-Ordner anlegen & Repositories via curl spiegeln
+          # 2. Entferne eventuell verbliebene SigLevel-Einträge in Repositories
+          sed -i '/SigLevel/d' "$PACCONF"
+
+          # 3. Setze SigLevel = Never ganz oben in den [options]
+          sed -i '/\[options\]/a SigLevel = Never\nLocalFileSigLevel = Never' "$PACCONF"
+
+          # 4. Sync-Ordner anlegen & Datenbanken spiegeln
           mkdir -p /opt/devkitpro/pacman/var/lib/pacman/sync/
           curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-libs.db https://pkg.devkitpro.org/dkp-libs.db
           curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-linux.db https://pkg.devkitpro.org/dkp-linux.db
 
-          # 3. Paketinstallation durchführen
+          # 5. Pakete ohne Sync (-Sy) installieren
           dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
