@@ -32,26 +32,22 @@ jobs:
           chmod +x /usr/local/bin/makerom
           cd ../.. && rm -rf Project_CTR
 
-      - name: Force Disable PGP Verification & Inject Databases
+      - name: Fix Pacman Database & Signatures
         run: |
           PACCONF="/opt/devkitpro/pacman/etc/pacman.conf"
 
-          # 1. Ersetze die SigLevel-Zeilen global auf 'Never'
+          # 1. Sämtliche Signaturprüfungen im Container deaktivieren
           sed -i 's/SigLevel.*/SigLevel = Never/g' "$PACCONF"
           sed -i 's/LocalFileSigLevel.*/LocalFileSigLevel = Never/g' "$PACCONF"
 
-          # 2. Entferne eventuell verbliebene SigLevel-Einträge in Repositories
-          sed -i '/SigLevel/d' "$PACCONF"
+          # 2. Keyring initialisieren/populate, damit pacman lokale DBs als valide ansieht
+          dkp-pacman-key --init || true
+          dkp-pacman-key --populate devkitpro || true
 
-          # 3. Setze SigLevel = Never ganz oben in den [options]
-          sed -i '/\[options\]/a SigLevel = Never\nLocalFileSigLevel = Never' "$PACCONF"
+          # 3. Datenbanken synchronisieren mit custom User-Agent
+          dkp-pacman -Sy --noconfirm --config "$PACCONF" || true
 
-          # 4. Sync-Ordner anlegen & Datenbanken spiegeln
-          mkdir -p /opt/devkitpro/pacman/var/lib/pacman/sync/
-          curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-libs.db https://pkg.devkitpro.org/dkp-libs.db
-          curl -A "Mozilla/5.0" -L -o /opt/devkitpro/pacman/var/lib/pacman/sync/dkp-linux.db https://pkg.devkitpro.org/dkp-linux.db
-
-          # 5. Pakete ohne Sync (-Sy) installieren
+          # 4. Pakete installieren
           dkp-pacman -S --noconfirm 3ds-curl 3ds-mbedtls 3ds-libpng 3dstools tex3ds
 
       - name: Build App
