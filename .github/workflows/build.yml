@@ -1,38 +1,124 @@
 name: Build FoxWebChat
+
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: devkitpro/devkitarm:latest
+
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: Update package database
+
+      - name: Install devkitPro
         run: |
-          dkp-pacman -Sy --noconfirm
-      - name: Install 3DS dependencies
-        run: |
-          dkp-pacman -S --noconfirm --needed \
-            devkitARM \
-            libctru \
-            citro2d \
-            citro3d \
+          sudo apt-get update
+
+          sudo mkdir -p /usr/local/share/keyrings
+          curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg | \
+            sudo gpg --dearmor -o /usr/local/share/keyrings/devkitpro.gpg
+
+          echo "deb [signed-by=/usr/local/share/keyrings/devkitpro.gpg] https://apt.devkitpro.org stable main" | \
+            sudo tee /etc/apt/sources.list.d/devkitpro.list
+
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            devkitpro-pacman
+
+          sudo dkp-pacman -Syu --noconfirm
+
+          sudo dkp-pacman -S --noconfirm \
+            3ds-dev \
             3ds-portlibs
-      - name: Verify environment
+
+      - name: Verify installation
         run: |
           echo "DEVKITPRO=$DEVKITPRO"
           echo "DEVKITARM=$DEVKITARM"
-          ls -la "$DEVKITPRO"
-      - name: Clean
-        run: make clean
+
+          ls -la /opt/devkitpro
+          find /opt/devkitpro -name 3ds_rules
+
       - name: Build
-        run: make -j$(nproc)
+        run: |
+          make clean
+          make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FoxWebChat
+          if-no-files-found: error
+          path: |
+            *.3dsx
+            *.elf
+            *.cia
+            *.smdhname: Build FoxWebChat
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITARM: /opt/devkitpro/devkitARM
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install devkitPro
+        run: |
+          sudo apt-get update
+
+          sudo mkdir -p /usr/local/share/keyrings
+          curl -fsSL https://apt.devkitpro.org/devkitpro-pub.gpg | \
+            sudo gpg --dearmor -o /usr/local/share/keyrings/devkitpro.gpg
+
+          echo "deb [signed-by=/usr/local/share/keyrings/devkitpro.gpg] https://apt.devkitpro.org stable main" | \
+            sudo tee /etc/apt/sources.list.d/devkitpro.list
+
+          sudo apt-get update
+
+          sudo apt-get install -y \
+            devkitpro-pacman
+
+          sudo dkp-pacman -Syu --noconfirm
+
+          sudo dkp-pacman -S --noconfirm \
+            3ds-dev \
+            3ds-portlibs
+
+      - name: Verify installation
+        run: |
+          echo "DEVKITPRO=$DEVKITPRO"
+          echo "DEVKITARM=$DEVKITARM"
+
+          ls -la /opt/devkitpro
+          find /opt/devkitpro -name 3ds_rules
+
+      - name: Build
+        run: |
+          make clean
+          make
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -43,6 +129,3 @@ jobs:
             *.elf
             *.cia
             *.smdh
-            build/**/*.3dsx
-            build/**/*.elf
-            build/**/*.cia
