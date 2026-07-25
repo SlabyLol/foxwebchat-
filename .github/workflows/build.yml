@@ -5,6 +5,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     container:
       image: devkitpro/devkitarm
     steps:
@@ -40,3 +42,17 @@ jobs:
           path: |
             ./*.cia
             ./*.3dsx
+
+    - name: Create/update GitHub Release
+      if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: nightly
+        name: "Nightly Build"
+        prerelease: false
+        body: "Automatic Build Release"
+        files: |
+          ./*.cia
+          ./*.3dsx
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
