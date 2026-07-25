@@ -1,5 +1,5 @@
 # Target settings
-TARGET      := foxwebchat
+TARGET      := FoxWebChat
 BUILD       := build
 SOURCES     := source
 INCLUDES    := include
