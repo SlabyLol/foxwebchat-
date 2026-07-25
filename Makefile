@@ -40,11 +40,13 @@ export INCLUDE  := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
                    $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
                    -I$(CURDIR)/$(BUILD)
 
-.PHONY: all clean 3dsx
+.PHONY: all clean 3dsx cia
 
 all: 3dsx
 
 3dsx: $(TARGET).3dsx
+
+cia: $(TARGET).cia
 
 $(TARGET).3dsx: $(TARGET).elf
 	@echo "Building $(TARGET).3dsx using resources icon..."
@@ -55,6 +57,16 @@ $(TARGET).3dsx: $(TARGET).elf
 	fi
 	@3dsxtool $(TARGET).elf $(TARGET).3dsx --smdh=icon.bin
 	@rm -f icon.bin
+
+$(TARGET).cia: $(TARGET).elf
+	@echo "Building $(TARGET).cia..."
+	@test -f resources/banner.wav || (echo "ERROR: resources/banner.wav fehlt (16-bit WAV fuer den CIA-Banner-Sound)."; exit 1)
+	@bannertool makesmdh -s "$(APP_TITLE)" -l "$(APP_TITLE)" -p "$(APP_AUTHOR)" -i $(ICON) -o icon.smdh
+	@bannertool makebanner -i resources/banner.png -a resources/banner.wav -o banner.bin
+	@cp $(TARGET).elf $(TARGET)_cia.elf
+	@arm-none-eabi-strip $(TARGET)_cia.elf
+	@makerom -f cia -o $(TARGET).cia -rsf app.rsf -target t -exefslogo -elf $(TARGET)_cia.elf -icon icon.smdh -banner banner.bin
+	@rm -f icon.smdh banner.bin $(TARGET)_cia.elf
 
 clean:
 	@rm -rf $(BUILD) $(TARGET).3dsx $(TARGET).elf icon.bin
