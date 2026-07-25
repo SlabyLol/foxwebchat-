@@ -65,7 +65,7 @@ $(TARGET).cia: $(TARGET).elf
 	@bannertool makebanner -i resources/banner.png -a resources/banner.wav -o banner.bin
 	@cp $(TARGET).elf $(TARGET)_cia.elf
 	@arm-none-eabi-strip $(TARGET)_cia.elf
-	@makerom -f cia -o $(TARGET).cia -rsf app.rsf -target t -exefslogo -elf $(TARGET)_cia.elf -icon icon.smdh -banner banner.bin
+	@makerom -f cia -o $(TARGET).cia -rsf app.rsf -target t -exefslogo -elf $(TARGET)_cia.elf -icon icon.smdh -banner banner.bin -desc app:4
 	@rm -f icon.smdh banner.bin $(TARGET)_cia.elf
 
 clean:
