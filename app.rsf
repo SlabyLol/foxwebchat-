@@ -13,7 +13,6 @@ Option:
   UseOnSD                 : True
   FreeProductCode         : True
   MediaFootPadding        : True
-  EnableL2Cache           : True
 
 AccessControlInfo:
   CoreVersion             : 2
