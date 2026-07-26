@@ -496,8 +496,8 @@ static void draw_update_prompt() {
 
     C2D_TargetClear(bottomTarget, C_MID);
     C2D_SceneBegin(bottomTarget);
-    draw_text_centered(160, 90, 0.46f, C_WHITE, "Install update?");
-    draw_text_centered(160, 130, 0.42f, C_WHITE, "(A) Yes    (B) No");
+    draw_text_centered(160, 90, 0.46f, C_WHITE, "Update required!");
+    draw_text_centered(160, 130, 0.42f, C_WHITE, "(A) Download   (B) Exit");
 }
 
 // Waehrend des Downloads
@@ -558,7 +558,8 @@ int main(int argc, char **argv) {
     check_for_updates();
 
     if (updateAvailable) {
-        // Bestaetigungs-Dialog: (A) Yes -> Download-Hinweis, (B) No -> weiter zur App
+        // Update ist Pflicht: (A) laedt herunter, (B) beendet die App direkt.
+        // In BEIDEN Faellen wird die App danach beendet, nicht weiter fortgesetzt.
         bool waitingForChoice = true;
         while (waitingForChoice && aptMainLoop()) {
             hidScanInput();
@@ -596,6 +597,16 @@ int main(int argc, char **argv) {
                 waitingForChoice = false;
             }
         }
+
+        // Pflicht-Update: App hier in jedem Fall sauber beenden statt fortzusetzen
+        curl_global_cleanup();
+        socExit();
+        if (soc_buffer) free(soc_buffer);
+        C2D_TextBufDelete(dynamicBuf);
+        C2D_Fini();
+        C3D_Fini();
+        gfxExit();
+        return 0;
     } else {
         // "Up to date" / "Update check failed" kurz anzeigen, bevor es in die App geht
         C2D_TextBufClear(dynamicBuf);
