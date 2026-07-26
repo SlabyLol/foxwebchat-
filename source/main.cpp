@@ -387,6 +387,11 @@ static void draw_top_screen() {
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
     draw_text(8, 8, 0.62f, C_WHITE, "FoxWebChat");
 
+    if ((kDown & KEY_SELECT) && isAdmin) {
+        draw_text(8, 18, 0.86f, C_ADMIN, "SUCCESS");
+    };
+        
+
     std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
     if (isAdmin) statusLine += "  (ADMIN)";
     draw_text(150, 12, 0.48f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
