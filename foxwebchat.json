@@ -11,7 +11,9 @@
 	"llm_generation": "no",
 	"icon": "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/refs/heads/main/resources/icon.png",
 	"image": "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/refs/heads/main/resources/banner.png",
-	"unique_ids": [],
+	"unique_ids": [
+		0xF0011
+	],
 	"long_description": "An Public Chat for everyone!",
 	"preinstall_message": "!WARNING! BEING MEAN OR SPAMMING REPORT FOR NOTHING WILL RESULT IN A BAN!"
 }
