@@ -470,6 +470,7 @@ static void draw_bottom_screen() {
     draw_text(16, 172, 0.36f, C_MUTED, "D-Pad Up/Down - Select message");
     draw_text(16, 189, 0.36f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
     draw_text(16, 206, 0.36f, C_MUTED, "[START] - Exit");
+    draw_text(16, 223, 0.40f, C_DARK, "Unfair kick?: Contact darkfox.tobias@outlook.com");
 }
 
 // Vollflaechiger Splash-Screen (z.B. fuer den Update-Check beim Start)
