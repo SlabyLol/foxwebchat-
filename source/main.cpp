@@ -22,6 +22,7 @@
 #define C_SELECT_BG C2D_Color32(255,213,181,255)   // Auswahl-Hervorhebung
 #define C_ADMIN     C2D_Color32(214,40,40,255)
 #define C_MUTED     C2D_Color32(120,90,80,255)
+#define C_BLACK     C2D_Color32(0,0,0,255)
 
 struct ChatMessage {
     std::string user;
@@ -424,6 +425,36 @@ static void draw_splash_screen(const std::string& message, u32 messageColor) {
     draw_text_centered(160, 110, 0.40f, C_WHITE, message);
 }
 
+// Bestaetigungs-Screen: "Update available" (schwarzer Text) + (A) Yes / (B) No
+static void draw_update_prompt() {
+    C2D_TargetClear(topTarget, C_BG);
+    C2D_SceneBegin(topTarget);
+    draw_fox(200, 76, 100);
+    draw_text_centered(200, 130, 0.56f, C_WHITE, "FoxWebChat");
+    draw_text_centered(200, 166, 0.54f, C_BLACK, "Update available");
+    draw_text_centered(200, 196, 0.38f, C_DARK, updateStatus);
+
+    C2D_TargetClear(bottomTarget, C_MID);
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 90, 0.46f, C_WHITE, "Install update?");
+    draw_text_centered(160, 130, 0.42f, C_WHITE, "(A) Yes    (B) No");
+}
+
+// Hinweis-Screen mit der Download-Seite, nachdem (A) Yes gedrueckt wurde
+static void draw_update_download_info() {
+    C2D_TargetClear(topTarget, C_BG);
+    C2D_SceneBegin(topTarget);
+    draw_text_centered(200, 80, 0.46f, C_WHITE, "Open this page to download:");
+    draw_text_centered(200, 112, 0.40f, C_CREAM, "github.com/SlabyLol/foxwebchat-");
+    draw_text_centered(200, 134, 0.40f, C_CREAM, "/releases/tag/nightly");
+    draw_text_centered(200, 176, 0.36f, C_MUTED, "Install the .cia with FBI, then");
+    draw_text_centered(200, 194, 0.36f, C_MUTED, "press any button to continue");
+
+    C2D_TargetClear(bottomTarget, C_MID);
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 110, 0.40f, C_WHITE, "Press A / B / START to continue");
+}
+
 int main(int argc, char **argv) {
     gfxInitDefault();
 
@@ -448,12 +479,44 @@ int main(int argc, char **argv) {
 
     check_for_updates();
 
-    // Ergebnis kurz anzeigen, bevor es in die App geht
-    C2D_TextBufClear(dynamicBuf);
-    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-        draw_splash_screen(updateStatus, updateAvailable ? C2D_Color32(255,225,120,255) : C_CREAM);
-    C3D_FrameEnd(0);
-    svcSleepThread(1200000000LL); // 1.2 Sekunden
+    if (updateAvailable) {
+        // Bestaetigungs-Dialog: (A) Yes -> Download-Hinweis, (B) No -> weiter zur App
+        bool waitingForChoice = true;
+        while (waitingForChoice && aptMainLoop()) {
+            hidScanInput();
+            u32 kd = hidKeysDown();
+
+            C2D_TextBufClear(dynamicBuf);
+            C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                draw_update_prompt();
+            C3D_FrameEnd(0);
+
+            if (kd & KEY_A) {
+                bool showingInfo = true;
+                while (showingInfo && aptMainLoop()) {
+                    hidScanInput();
+                    u32 kd2 = hidKeysDown();
+
+                    C2D_TextBufClear(dynamicBuf);
+                    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                        draw_update_download_info();
+                    C3D_FrameEnd(0);
+
+                    if (kd2 & (KEY_A | KEY_B | KEY_START)) showingInfo = false;
+                }
+                waitingForChoice = false;
+            } else if (kd & KEY_B) {
+                waitingForChoice = false;
+            }
+        }
+    } else {
+        // "Up to date" / "Update check failed" kurz anzeigen, bevor es in die App geht
+        C2D_TextBufClear(dynamicBuf);
+        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+            draw_splash_screen(updateStatus, C_CREAM);
+        C3D_FrameEnd(0);
+        svcSleepThread(1200000000LL); // 1.2 Sekunden
+    }
 
     while (aptMainLoop()) {
         hidScanInput();
