@@ -1,0 +1,10 @@
+# FoxWebChat theme file (.fwct)
+# Created with the FoxWebChat Theme Creator
+name=test theme
+bg=94,58,158
+mid=132,17,96
+white=255,255,255
+cream=255,247,240
+dark=42,26,20
+selectBg=117,255,48
+muted=69,168,228
