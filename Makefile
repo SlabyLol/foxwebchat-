@@ -7,7 +7,7 @@ ICON        := resources/icon.png
 
 APP_TITLE   := FoxWebChat
 APP_AUTHOR  := DarkFox Co.
-APP_VERSION := 1.0.0
+APP_VERSION := 1.1.0
 
 # DevkitPro environment setup
 ifeq ($(strip $(DEVKITARM)),)
@@ -20,7 +20,7 @@ PORTLIBS_PATH ?= $(DEVKITPRO)/portlibs
 
 # Flags & Libraries
 ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
-CFLAGS      := -Wall -O2 -mword-relocations $(ARCH)
+CFLAGS      := -Wall -O2 -mword-relocations $(ARCH) -DAPP_VERSION_STR=\"$(APP_VERSION)\"
 CXXFLAGS    := $(CFLAGS) -fno-rtti -fno-exceptions
 
 LIBS        := -lcitro2d -lcitro3d -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lz -lctru -lm
