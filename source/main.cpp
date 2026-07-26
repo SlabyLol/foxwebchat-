@@ -210,6 +210,48 @@ void fetch_reports() {
     }
 }
 
+#ifndef APP_VERSION_STR
+#define APP_VERSION_STR "1.0.0"
+#endif
+
+static std::string updateStatus = "Checking for updates...";
+static bool updateAvailable = false;
+
+static std::string strip_quotes(const std::string& s) {
+    if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
+        return s.substr(1, s.size() - 2);
+    }
+    return s;
+}
+
+// Erwartet in Firebase unter dem Pfad "version" einen simplen String-Wert,
+// z.B. per Firebase-Konsole: version: "1.0.1"
+void check_for_updates() {
+    updateStatus = "Checking for updates...";
+    std::string json = firebase_get("version");
+
+    if (json.empty() || json == "null") {
+        updateStatus = "Update check failed";
+        updateAvailable = false;
+        return;
+    }
+
+    std::string latestVersion = strip_quotes(json);
+    if (latestVersion.empty()) {
+        updateStatus = "Update check failed";
+        updateAvailable = false;
+        return;
+    }
+
+    if (latestVersion != APP_VERSION_STR) {
+        updateAvailable = true;
+        updateStatus = "Update available: v" + latestVersion;
+    } else {
+        updateAvailable = false;
+        updateStatus = "Up to date (v" APP_VERSION_STR ")";
+    }
+}
+
 void open_keyboard(char* out_text, size_t max_len, const char* hint) {
     SwkbdState swkbd;
     swkbdInit(&swkbd, SWKBD_TYPE_NORMAL, 2, -1);
@@ -269,69 +311,69 @@ static void draw_fox(float cx, float cy, float w) {
 // ---------------------------------------------------------------------
 static void draw_top_screen() {
     const float SCREEN_W = 400.0f;
-    const float HEADER_H = 32.0f;
+    const float HEADER_H = 34.0f;
 
     // Kopfzeile
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
-    draw_text(8, 8, 0.55f, C_WHITE, "FoxWebChat");
+    draw_text(8, 8, 0.62f, C_WHITE, "FoxWebChat");
 
     std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
     if (isAdmin) statusLine += "  (ADMIN)";
-    draw_text(140, 11, 0.42f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
+    draw_text(150, 12, 0.48f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
 
     if (isKicked) {
-        draw_text(20, 90, 0.55f, C_ADMIN, "You have been kicked by an Admin!");
-        draw_text(20, 115, 0.45f, C_DARK, std::string("Reason: ") + kickReason);
-        draw_text(20, 150, 0.42f, C_MUTED, "Press [START] to exit");
+        draw_text(20, 90, 0.62f, C_ADMIN, "You have been kicked by an Admin!");
+        draw_text(20, 118, 0.52f, C_DARK, std::string("Reason: ") + kickReason);
+        draw_text(20, 155, 0.48f, C_MUTED, "Press [START] to exit");
         return;
     }
 
     if (strlen(username) == 0) {
-        draw_text(20, 60, 0.5f, C_DARK, "Press (A) to enter name / join");
-        draw_text(20, 85, 0.42f, C_MUTED, "Press [START] to exit");
+        draw_text(20, 60, 0.58f, C_DARK, "Press (A) to enter name / join");
+        draw_text(20, 88, 0.48f, C_MUTED, "Press [START] to exit");
         return;
     }
 
     float y = HEADER_H + 8;
 
     if (showAdminPanel) {
-        draw_text(8, y, 0.48f, C_ADMIN, "=== ADMIN PANEL ==="); y += 20;
-        draw_text(8, y, 0.38f, C_MUTED, "(B) Close  (X) Kick  (Y) Clear Reports"); y += 14;
-        draw_text(8, y, 0.38f, C_MUTED, "(L) Clear Messages  (R) Unban All"); y += 18;
+        draw_text(8, y, 0.55f, C_ADMIN, "=== ADMIN PANEL ==="); y += 22;
+        draw_text(8, y, 0.44f, C_MUTED, "(B) Close  (X) Kick  (Y) Clear Reports"); y += 16;
+        draw_text(8, y, 0.44f, C_MUTED, "(L) Clear Messages  (R) Unban All"); y += 20;
 
         if (reportList.empty()) {
-            draw_text(8, y, 0.42f, C_MUTED, "No active reports.");
+            draw_text(8, y, 0.48f, C_MUTED, "No active reports.");
         } else {
-            for (size_t i = 0; i < reportList.size() && y < 232; i++) {
+            for (size_t i = 0; i < reportList.size() && y < 230; i++) {
                 bool sel = (int)i == selectedReportIndex;
-                if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 16, C_SELECT_BG);
+                if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
                 std::string line = "[" + reportList[i].user + "]: \"" +
                     truncate_text(reportList[i].text, 28) + "\" (" +
                     truncate_text(reportList[i].reason, 18) + ")";
-                draw_text(8, y, 0.36f, sel ? C_MID : C_DARK, line);
-                y += 16;
+                draw_text(8, y, 0.42f, sel ? C_MID : C_DARK, line);
+                y += 18;
             }
         }
         return;
     }
 
-    draw_text(8, y, 0.36f, C_MUTED, "D-Pad: Select   (X) Send   (Y) Report");
-    y += 14;
+    draw_text(8, y, 0.42f, C_MUTED, "D-Pad: Select   (X) Send   (Y) Report");
+    y += 16;
     if (isAdmin) {
-        draw_text(8, y, 0.36f, C_ADMIN, "(B) Admin Panel");
-        y += 14;
+        draw_text(8, y, 0.42f, C_ADMIN, "(B) Admin Panel");
+        y += 16;
     }
     y += 4;
 
     if (messageList.empty()) {
-        draw_text(8, y, 0.42f, C_MUTED, "No messages available.");
+        draw_text(8, y, 0.48f, C_MUTED, "No messages available.");
     } else {
-        for (size_t i = 0; i < messageList.size() && y < 232; i++) {
+        for (size_t i = 0; i < messageList.size() && y < 230; i++) {
             bool sel = (int)i == selectedMsgIndex;
-            if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 16, C_SELECT_BG);
+            if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
             std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, 42);
-            draw_text(8, y, 0.38f, sel ? C_MID : C_DARK, line);
-            y += 16;
+            draw_text(8, y, 0.44f, sel ? C_MID : C_DARK, line);
+            y += 18;
         }
     }
 }
@@ -345,16 +387,20 @@ static void draw_bottom_screen() {
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, 60, C_MID);
 
     draw_fox(48, 30, 64);
-    draw_text(90, 8, 0.55f, C_WHITE, "FoxWebChat");
-    draw_text(90, 32, 0.34f, C_CREAM, "DarkFox Co.");
+    draw_text(90, 8, 0.62f, C_WHITE, "FoxWebChat");
+    draw_text(90, 34, 0.40f, C_CREAM, "DarkFox Co.");
 
-    draw_text(16, 72, 0.36f, C_DARK, "Web Edition:");
-    draw_text(16, 90, 0.32f, C_MUTED, "slabylol.github.io/foxwebchat-/");
+    draw_text(16, 74, 0.42f, C_DARK, "Web Edition:");
+    draw_text(16, 93, 0.36f, C_MUTED, "slabylol.github.io/foxwebchat-/");
 
-    draw_text(16, 150, 0.34f, C_DARK, "Controls:");
-    draw_text(16, 168, 0.30f, C_MUTED, "D-Pad Up/Down - Select message");
-    draw_text(16, 184, 0.30f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
-    draw_text(16, 200, 0.30f, C_MUTED, "[START] - Exit");
+    u32 updateColor = updateAvailable ? C2D_Color32(214,150,20,255) : C_MUTED;
+    draw_text(16, 113, 0.36f, updateColor, updateStatus);
+    draw_text(16, 130, 0.30f, C_MUTED, "[SELECT] - Check for updates");
+
+    draw_text(16, 154, 0.40f, C_DARK, "Controls:");
+    draw_text(16, 172, 0.36f, C_MUTED, "D-Pad Up/Down - Select message");
+    draw_text(16, 189, 0.36f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
+    draw_text(16, 206, 0.36f, C_MUTED, "[START] - Exit");
 }
 
 int main(int argc, char **argv) {
@@ -373,11 +419,17 @@ int main(int argc, char **argv) {
     if (soc_buffer != NULL) socInit(soc_buffer, 0x100000);
     curl_global_init(CURL_GLOBAL_ALL);
 
+    check_for_updates();
+
     while (aptMainLoop()) {
         hidScanInput();
         u32 kDown = hidKeysDown();
 
         if (kDown & KEY_START) break;
+
+        if (kDown & KEY_SELECT) {
+            check_for_updates();
+        }
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
             check_kick_status();
