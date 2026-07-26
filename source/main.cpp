@@ -6,6 +6,7 @@
 #include <malloc.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <dirent.h>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -17,12 +18,14 @@
 #define UPDATE_CIA_DIR "sdmc:/3ds/FoxWebChat"
 #define UPDATE_CIA_PATH "sdmc:/3ds/FoxWebChat/FoxWebChat.cia"
 #define THEME_CFG_PATH "sdmc:/3ds/FoxWebChat/theme.cfg"
+#define CUSTOM_THEMES_DIR "sdmc:/3ds/FoxWebChat/themes"
 
 // ---------------------------------------------------------------------
-// Themes: mehrere Farbschemata, durchschaltbar mit D-Pad Links/Rechts
+// Themes: mehrere Farbschemata, durchschaltbar mit D-Pad Links/Rechts.
+// Eigene Themes koennen als .fwct-Dateien in CUSTOM_THEMES_DIR abgelegt werden.
 // ---------------------------------------------------------------------
 struct Theme {
-    const char* name;
+    std::string name;
     u32 bg;        // Haupt-Akzentfarbe (Kopfzeile, unterer Bildschirm)
     u32 mid;       // dunklere Akzentfarbe
     u32 white;     // Fuchs / helle Flaechen
@@ -53,10 +56,31 @@ static const Theme THEMES[] = {
                        C2D_Color32(235,235,240,255), C2D_Color32(200,200,210,255),
                        C2D_Color32(235,235,240,255), C2D_Color32(95,95,115,255),
                        C2D_Color32(255,90,90,255),  C2D_Color32(150,150,162,255) },
+
+    { "Wald",          C2D_Color32(60,140,70,255),  C2D_Color32(38,105,50,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(235,250,236,255),
+                       C2D_Color32(24,45,28,255),   C2D_Color32(195,235,200,255),
+                       C2D_Color32(214,40,40,255),  C2D_Color32(120,155,125,255) },
+
+    { "Pastell",       C2D_Color32(240,150,190,255), C2D_Color32(215,110,155,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(255,240,247,255),
+                       C2D_Color32(70,30,48,255),   C2D_Color32(255,215,232,255),
+                       C2D_Color32(214,40,40,255),  C2D_Color32(180,120,150,255) },
+
+    { "Sonnenschein",  C2D_Color32(250,190,40,255), C2D_Color32(220,155,10,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(255,248,225,255),
+                       C2D_Color32(70,52,10,255),   C2D_Color32(255,232,170,255),
+                       C2D_Color32(214,40,40,255),  C2D_Color32(150,130,80,255) },
+
+    { "Tuerkis",       C2D_Color32(35,170,165,255), C2D_Color32(20,125,120,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(228,252,250,255),
+                       C2D_Color32(15,55,53,255),   C2D_Color32(180,240,236,255),
+                       C2D_Color32(230,60,60,255),  C2D_Color32(110,160,158,255) },
 };
 static const int THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
+static std::vector<Theme> allThemes;  // eingebaute Themes + geladene .fwct-Dateien
 static int currentThemeIndex = 0;
-static const Theme* currentTheme = &THEMES[0];
+static const Theme* currentTheme = &THEMES[0];  // wird in main() auf &allThemes[...] umgebogen
 
 // ---------------------------------------------------------------------
 // Farbpalette - liest sich immer aus dem aktuell gewaehlten Theme
@@ -194,17 +218,131 @@ static void ensure_dir(const char* path) {
     }
 }
 
+// Parst eine einzelne "r,g,b"-Zeile aus einer .fwct-Datei
+static bool parse_fwct_color(const std::string& value, u32& outColor) {
+    int r = 0, g = 0, b = 0;
+    if (sscanf(value.c_str(), "%d,%d,%d", &r, &g, &b) == 3) {
+        r = std::max(0, std::min(255, r));
+        g = std::max(0, std::min(255, g));
+        b = std::max(0, std::min(255, b));
+        outColor = C2D_Color32(r, g, b, 255);
+        return true;
+    }
+    return false;
+}
+
+// Laedt eine einzelne .fwct-Datei. Fehlende Zeilen behalten den Wert von "base" (Fallback: Orange-Theme).
+static bool load_fwct_file(const std::string& path, const Theme& base, Theme& outTheme) {
+    FILE* fp = fopen(path.c_str(), "r");
+    if (!fp) return false;
+
+    Theme t = base;
+    bool gotAny = false;
+    char lineBuf[256];
+
+    while (fgets(lineBuf, sizeof(lineBuf), fp)) {
+        std::string line(lineBuf);
+        while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+
+        u32 col;
+        if (key == "name")           { t.name = val; gotAny = true; }
+        else if (key == "bg"         && parse_fwct_color(val, col)) { t.bg = col; gotAny = true; }
+        else if (key == "mid"        && parse_fwct_color(val, col)) { t.mid = col; gotAny = true; }
+        else if (key == "white"      && parse_fwct_color(val, col)) { t.white = col; gotAny = true; }
+        else if (key == "cream"      && parse_fwct_color(val, col)) { t.cream = col; gotAny = true; }
+        else if (key == "dark"       && parse_fwct_color(val, col)) { t.dark = col; gotAny = true; }
+        else if (key == "selectBg"   && parse_fwct_color(val, col)) { t.selectBg = col; gotAny = true; }
+        else if (key == "muted"      && parse_fwct_color(val, col)) { t.muted = col; gotAny = true; }
+    }
+    fclose(fp);
+
+    if (!gotAny) return false;
+    outTheme = t;
+    return true;
+}
+
+// Legt das Theme-Verzeichnis an und schreibt beim allerersten Start eine Beispiel-Datei,
+// damit man direkt sieht, wie ein eigenes .fwct-Theme aussehen muss.
+static void ensure_custom_themes_dir() {
+    ensure_dir("sdmc:/3ds");
+    ensure_dir(UPDATE_CIA_DIR);
+
+    struct stat st;
+    bool existed = (stat(CUSTOM_THEMES_DIR, &st) == 0);
+    ensure_dir(CUSTOM_THEMES_DIR);
+
+    if (!existed) {
+        std::string examplePath = std::string(CUSTOM_THEMES_DIR) + "/example.fwct";
+        FILE* fp = fopen(examplePath.c_str(), "w");
+        if (fp) {
+            fprintf(fp,
+                "# FoxWebChat Theme-Datei (.fwct)\n"
+                "# Farben als r,g,b (0-255). Zeilen mit # sind Kommentare.\n"
+                "# Diese Datei kopieren, umbenennen und Werte anpassen fuer ein eigenes Theme.\n"
+                "name=Mein Theme\n"
+                "bg=247,127,51\n"
+                "mid=225,90,35\n"
+                "white=255,255,255\n"
+                "cream=255,247,240\n"
+                "dark=61,33,26\n"
+                "selectBg=255,213,181\n"
+                "muted=120,90,80\n"
+            );
+            fclose(fp);
+        }
+    }
+}
+
+// Durchsucht CUSTOM_THEMES_DIR nach .fwct-Dateien und haengt gueltige Themes an allThemes an.
+static void load_custom_themes() {
+    ensure_custom_themes_dir();
+
+    DIR* d = opendir(CUSTOM_THEMES_DIR);
+    if (!d) return;
+
+    struct dirent* entry;
+    while ((entry = readdir(d)) != NULL) {
+        std::string fname = entry->d_name;
+        if (fname.size() <= 5) continue;
+        if (fname.substr(fname.size() - 5) != ".fwct") continue;
+
+        Theme t = THEMES[0]; // Orange als Basis fuer fehlende Werte
+        t.name = fname.substr(0, fname.size() - 5);
+
+        std::string fullPath = std::string(CUSTOM_THEMES_DIR) + "/" + fname;
+        Theme loaded;
+        if (load_fwct_file(fullPath, t, loaded)) {
+            allThemes.push_back(loaded);
+        }
+    }
+    closedir(d);
+}
+
+// Baut die komplette Theme-Liste (eingebaut + eigene) auf. Vor load_theme() aufrufen.
+static void init_themes() {
+    allThemes.clear();
+    for (int i = 0; i < THEME_COUNT; i++) allThemes.push_back(THEMES[i]);
+    load_custom_themes();
+}
+
 // Theme-Wahl auf der SD-Karte speichern / laden
 static void load_theme() {
     FILE* fp = fopen(THEME_CFG_PATH, "r");
     if (fp) {
         int idx = -1;
-        if (fscanf(fp, "%d", &idx) == 1 && idx >= 0 && idx < THEME_COUNT) {
+        if (fscanf(fp, "%d", &idx) == 1 && idx >= 0 && idx < (int)allThemes.size()) {
             currentThemeIndex = idx;
         }
         fclose(fp);
     }
-    currentTheme = &THEMES[currentThemeIndex];
+    if (currentThemeIndex >= (int)allThemes.size()) currentThemeIndex = 0;
+    currentTheme = &allThemes[currentThemeIndex];
 }
 
 static void save_theme() {
@@ -667,6 +805,7 @@ int main(int argc, char **argv) {
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     dynamicBuf = C2D_TextBufNew(4096);
 
+    init_themes();
     load_theme();
 
     // Sockets & CURL initialisieren
@@ -753,13 +892,13 @@ int main(int argc, char **argv) {
 
         // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
         if (kDown & KEY_DRIGHT) {
-            currentThemeIndex = (currentThemeIndex + 1) % THEME_COUNT;
-            currentTheme = &THEMES[currentThemeIndex];
+            currentThemeIndex = (currentThemeIndex + 1) % (int)allThemes.size();
+            currentTheme = &allThemes[currentThemeIndex];
             save_theme();
         }
         if (kDown & KEY_DLEFT) {
-            currentThemeIndex = (currentThemeIndex - 1 + THEME_COUNT) % THEME_COUNT;
-            currentTheme = &THEMES[currentThemeIndex];
+            currentThemeIndex = (currentThemeIndex - 1 + (int)allThemes.size()) % (int)allThemes.size();
+            currentTheme = &allThemes[currentThemeIndex];
             save_theme();
         }
 
