@@ -624,7 +624,7 @@ int main(int argc, char **argv) {
         if (kDown & KEY_START) break;
 
         if ((kDown & KEY_SELECT) && isAdmin) {
-        draw_text(8, 18, 0.86f, C_ADMIN, "SUCCESS");
+        firebase_post("messages", "{\"user\":\"System\",\"text\":\"Something....\"}");
     };
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
