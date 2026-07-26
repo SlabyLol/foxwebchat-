@@ -1,4 +1,5 @@
 #include <3ds.h>
+#include <citro2d.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,16 +11,17 @@
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
 #define ADMIN_CODE "AdminJs93€=no"
 
-// ASCII/Unicode Fox Artwork
-const char* FOX_ART = R"(     ________  _  ___      _________ 
-    / __/ __ \| |/_/ | /| / / __/ _ )
-   / _// /_/ />  < | |/ |/ / _// _  |
-  /_/  \____/_/|_|_|__/|__/___/____/ 
-       / ___/ // / _ /_  __/         
-      / /__/ _  / __ |/ /            
-      \___/_//_/_/ |_/_/             
-                                        ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-)";
+// ---------------------------------------------------------------------
+// Farbpalette (passend zu Icon/Banner: warmes Orange, flaches Design)
+// ---------------------------------------------------------------------
+#define C_BG        C2D_Color32(247,127,51,255)   // Haupt-Orange
+#define C_MID       C2D_Color32(225,90,35,255)    // dunkleres Orange (Akzent)
+#define C_WHITE     C2D_Color32(255,255,255,255)
+#define C_CREAM     C2D_Color32(255,247,240,255)
+#define C_DARK      C2D_Color32(61,33,26,255)      // Text / Augen
+#define C_SELECT_BG C2D_Color32(255,213,181,255)   // Auswahl-Hervorhebung
+#define C_ADMIN     C2D_Color32(214,40,40,255)
+#define C_MUTED     C2D_Color32(120,90,80,255)
 
 struct ChatMessage {
     std::string user;
@@ -44,9 +46,12 @@ int selectedMsgIndex = 0;
 int selectedReportIndex = 0;
 u64 lastFetchTime = 0;
 
-// Dual-Console Objekte
-static PrintConsole topConsole;
-static PrintConsole bottomConsole;
+// ---------------------------------------------------------------------
+// citro2d Render-Ziele & Text-Puffer
+// ---------------------------------------------------------------------
+static C3D_RenderTarget* topTarget;
+static C3D_RenderTarget* bottomTarget;
+static C2D_TextBuf dynamicBuf;
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -59,14 +64,14 @@ std::string firebase_get(const char* path) {
     if(curl) {
         char full_url[256];
         snprintf(full_url, sizeof(full_url), "%s/%s.json", FIREBASE_URL, path);
-        
+
         curl_easy_setopt(curl, CURLOPT_URL, full_url);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 2L);
-        
+
         curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }
@@ -78,7 +83,7 @@ void firebase_post(const char* path, const char* json_data) {
     if(curl) {
         char full_url[256];
         snprintf(full_url, sizeof(full_url), "%s/%s.json", FIREBASE_URL, path);
-        
+
         struct curl_slist *headers = curl_slist_append(NULL, "Content-Type: application/json");
 
         curl_easy_setopt(curl, CURLOPT_URL, full_url);
@@ -86,7 +91,7 @@ void firebase_post(const char* path, const char* json_data) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
-        
+
         curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
@@ -98,7 +103,7 @@ void firebase_put(const char* path, const char* json_data) {
     if(curl) {
         char full_url[256];
         snprintf(full_url, sizeof(full_url), "%s/%s.json", FIREBASE_URL, path);
-        
+
         struct curl_slist *headers = curl_slist_append(NULL, "Content-Type: application/json");
 
         curl_easy_setopt(curl, CURLOPT_URL, full_url);
@@ -107,7 +112,7 @@ void firebase_put(const char* path, const char* json_data) {
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
-        
+
         curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         curl_slist_free_all(headers);
@@ -124,7 +129,7 @@ void firebase_delete(const char* path) {
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3L);
-        
+
         curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }
@@ -135,7 +140,7 @@ void check_kick_status() {
     char path[128];
     snprintf(path, sizeof(path), "kicks/%s", username);
     std::string json = firebase_get(path);
-    
+
     if(!json.empty() && json != "null") {
         isKicked = true;
         snprintf(kickReason, sizeof(kickReason), "Kicked by Admin");
@@ -147,7 +152,7 @@ void check_kick_status() {
 std::string parse_json_value(const std::string& block, const std::string& key) {
     size_t keyPos = block.find("\"" + key + "\"");
     if (keyPos == std::string::npos) return "Unknown";
-    
+
     size_t colonPos = block.find(":", keyPos);
     if (colonPos == std::string::npos) return "Unknown";
 
@@ -212,95 +217,161 @@ void open_keyboard(char* out_text, size_t max_len, const char* hint) {
     swkbdInputText(&swkbd, out_text, max_len);
 }
 
-void draw_bottom_screen() {
-    consoleSelect(&bottomConsole);
-    consoleClear();
-    printf("%s\n", FOX_ART);
-    printf(" Web Edition:\n");
-    printf(" slabylol.github.io/foxwebchat-/\n");
+// ---------------------------------------------------------------------
+// Zeichen-Helfer
+// ---------------------------------------------------------------------
+
+static std::string truncate_text(const std::string& s, size_t maxLen) {
+    if (s.size() <= maxLen) return s;
+    return s.substr(0, maxLen - 3) + "...";
 }
 
-void redraw_screen() {
-    consoleSelect(&topConsole);
-    consoleClear();
-    
+static void draw_text(float x, float y, float scale, u32 color, const std::string& str) {
+    C2D_Text text;
+    C2D_TextParse(&text, dynamicBuf, str.c_str());
+    C2D_TextOptimize(&text);
+    C2D_DrawText(&text, C2D_WithColor, x, y, 0.5f, scale, scale, color);
+}
+
+// Fuchs-Kopf im flachen Stil (passend zu Icon & Banner), rein vektoriell gezeichnet
+static void draw_fox(float cx, float cy, float w) {
+    // Ohren (aussen weiss)
+    C2D_DrawTriangle(cx-w*0.46f, cy-w*0.62f, C_WHITE,
+                      cx-w*0.62f, cy-w*0.14f, C_WHITE,
+                      cx-w*0.08f, cy-w*0.30f, C_WHITE, 0.5f);
+    C2D_DrawTriangle(cx+w*0.46f, cy-w*0.62f, C_WHITE,
+                      cx+w*0.62f, cy-w*0.14f, C_WHITE,
+                      cx+w*0.08f, cy-w*0.30f, C_WHITE, 0.5f);
+    // Ohren innen (Akzentfarbe)
+    C2D_DrawTriangle(cx-w*0.40f, cy-w*0.46f, C_MID,
+                      cx-w*0.49f, cy-w*0.22f, C_MID,
+                      cx-w*0.20f, cy-w*0.30f, C_MID, 0.5f);
+    C2D_DrawTriangle(cx+w*0.40f, cy-w*0.46f, C_MID,
+                      cx+w*0.49f, cy-w*0.22f, C_MID,
+                      cx+w*0.20f, cy-w*0.30f, C_MID, 0.5f);
+    // Kopf
+    C2D_DrawEllipseSolid(cx - w*0.72f/2, cy - w*0.02f - w*0.62f/2, 0.5f, w*0.72f, w*0.62f, C_WHITE);
+    // Schnauze
+    C2D_DrawTriangle(cx-w*0.14f, cy+w*0.02f, C_BG,
+                      cx+w*0.14f, cy+w*0.02f, C_BG,
+                      cx,         cy+w*0.30f, C_BG, 0.5f);
+    // Augen
+    C2D_DrawCircleSolid(cx-w*0.16f, cy-w*0.02f, 0.5f, w*0.045f, C_DARK);
+    C2D_DrawCircleSolid(cx+w*0.16f, cy-w*0.02f, 0.5f, w*0.045f, C_DARK);
+    // Nase
+    C2D_DrawTriangle(cx-w*0.045f, cy+w*0.14f, C_DARK,
+                      cx+w*0.045f, cy+w*0.14f, C_DARK,
+                      cx,          cy+w*0.14f+w*0.045f*1.3f, C_DARK, 0.5f);
+}
+
+// ---------------------------------------------------------------------
+// Oberer Bildschirm: Titel, Statuszeilen, Nachrichten-/Report-Liste
+// ---------------------------------------------------------------------
+static void draw_top_screen() {
+    const float SCREEN_W = 400.0f;
+    const float HEADER_H = 32.0f;
+
+    // Kopfzeile
+    C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
+    draw_text(8, 8, 0.55f, C_WHITE, "FoxWebChat");
+
+    std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
+    if (isAdmin) statusLine += "  (ADMIN)";
+    draw_text(140, 11, 0.42f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
+
     if (isKicked) {
-        printf("\x1b[16;3H\x1b[31;1mYou have been kicked by an Admin!\x1b[0m\n");
-        printf("\x1b[18;3HReason: %s\n", kickReason);
-        printf("\x1b[22;3HPress [START] to exit\n");
+        draw_text(20, 90, 0.55f, C_ADMIN, "You have been kicked by an Admin!");
+        draw_text(20, 115, 0.45f, C_DARK, std::string("Reason: ") + kickReason);
+        draw_text(20, 150, 0.42f, C_MUTED, "Press [START] to exit");
         return;
     }
-
-    printf("\x1b[1;1HFoxWebChat 3DS - User: %s %s\n", 
-           strlen(username) > 0 ? username : "Not joined", 
-           isAdmin ? "\x1b[33;1m(ADMIN)\x1b[0m" : "");
-    printf("==================================================\n");
 
     if (strlen(username) == 0) {
-        printf("Press (A) to enter name / join\n");
-        printf("Press [START] to exit\n");
+        draw_text(20, 60, 0.5f, C_DARK, "Press (A) to enter name / join");
+        draw_text(20, 85, 0.42f, C_MUTED, "Press [START] to exit");
         return;
     }
+
+    float y = HEADER_H + 8;
 
     if (showAdminPanel) {
-        printf("\x1b[31;1m=== ADMIN PANEL ===\x1b[0m\n");
-        printf("(B): Close Panel | (X): Kick User\n");
-        printf("(Y): Clear Reports | (L): Clear Messages\n");
-        printf("(R): Clear Kicks (Unban All)\n");
-        printf("--------------------------------------------------\n");
+        draw_text(8, y, 0.48f, C_ADMIN, "=== ADMIN PANEL ==="); y += 20;
+        draw_text(8, y, 0.38f, C_MUTED, "(B) Close  (X) Kick  (Y) Clear Reports"); y += 14;
+        draw_text(8, y, 0.38f, C_MUTED, "(L) Clear Messages  (R) Unban All"); y += 18;
+
         if (reportList.empty()) {
-            printf("No active reports.\n");
+            draw_text(8, y, 0.42f, C_MUTED, "No active reports.");
         } else {
-            for(size_t i = 0; i < reportList.size(); i++) {
-                if((int)i == selectedReportIndex) {
-                    printf("\x1b[36;1m> [%s]: \"%s\" (Reason: %s)\x1b[0m\n", 
-                        reportList[i].user.c_str(), reportList[i].text.c_str(), reportList[i].reason.c_str());
-                } else {
-                    printf("  [%s]: \"%s\" (Reason: %s)\n", 
-                        reportList[i].user.c_str(), reportList[i].text.c_str(), reportList[i].reason.c_str());
-                }
+            for (size_t i = 0; i < reportList.size() && y < 232; i++) {
+                bool sel = (int)i == selectedReportIndex;
+                if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 16, C_SELECT_BG);
+                std::string line = "[" + reportList[i].user + "]: \"" +
+                    truncate_text(reportList[i].text, 28) + "\" (" +
+                    truncate_text(reportList[i].reason, 18) + ")";
+                draw_text(8, y, 0.36f, sel ? C_MID : C_DARK, line);
+                y += 16;
             }
         }
         return;
     }
 
-    printf("D-Pad [UP/DOWN]: Select Message\n");
-    printf("(X): Send Message | (Y): Report Message\n");
+    draw_text(8, y, 0.36f, C_MUTED, "D-Pad: Select   (X) Send   (Y) Report");
+    y += 14;
     if (isAdmin) {
-        printf("\x1b[33;1m(B): Admin Panel\x1b[0m\n");
+        draw_text(8, y, 0.36f, C_ADMIN, "(B) Admin Panel");
+        y += 14;
     }
-    printf("--------------------------------------------------\n");
+    y += 4;
 
     if (messageList.empty()) {
-        printf("No messages available.\n");
+        draw_text(8, y, 0.42f, C_MUTED, "No messages available.");
     } else {
-        for (size_t i = 0; i < messageList.size(); i++) {
-            if ((int)i == selectedMsgIndex) {
-                printf("\x1b[36;1m> [%s]: %s\x1b[0m\n", messageList[i].user.c_str(), messageList[i].text.c_str());
-            } else {
-                printf("  [%s]: %s\n", messageList[i].user.c_str(), messageList[i].text.c_str());
-            }
+        for (size_t i = 0; i < messageList.size() && y < 232; i++) {
+            bool sel = (int)i == selectedMsgIndex;
+            if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 16, C_SELECT_BG);
+            std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, 42);
+            draw_text(8, y, 0.38f, sel ? C_MID : C_DARK, line);
+            y += 16;
         }
     }
+}
+
+// ---------------------------------------------------------------------
+// Unterer Bildschirm: Branding (Fuchs, Wortmarke, Link, Steuerung)
+// ---------------------------------------------------------------------
+static void draw_bottom_screen() {
+    const float SCREEN_W = 320.0f;
+
+    C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, 60, C_MID);
+
+    draw_fox(48, 30, 64);
+    draw_text(90, 8, 0.55f, C_WHITE, "FoxWebChat");
+    draw_text(90, 32, 0.34f, C_CREAM, "DarkFox Co.");
+
+    draw_text(16, 72, 0.36f, C_DARK, "Web Edition:");
+    draw_text(16, 90, 0.32f, C_MUTED, "slabylol.github.io/foxwebchat-/");
+
+    draw_text(16, 150, 0.34f, C_DARK, "Controls:");
+    draw_text(16, 168, 0.30f, C_MUTED, "D-Pad Up/Down - Select message");
+    draw_text(16, 184, 0.30f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
+    draw_text(16, 200, 0.30f, C_MUTED, "[START] - Exit");
 }
 
 int main(int argc, char **argv) {
     gfxInitDefault();
-    
-    // Beide Bildschirme initialisieren
-    consoleInit(GFX_TOP, &topConsole);
-    consoleInit(GFX_BOTTOM, &bottomConsole);
-    
+
+    C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
+    C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
+    C2D_Prepare();
+
+    topTarget = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
+    bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
+    dynamicBuf = C2D_TextBufNew(4096);
+
     // Sockets & CURL initialisieren
     u32 *soc_buffer = (u32*)memalign(0x1000, 0x100000);
     if (soc_buffer != NULL) socInit(soc_buffer, 0x100000);
     curl_global_init(CURL_GLOBAL_ALL);
-
-    // Unteren Bildschirm zeichnen (Artwork + Link)
-    draw_bottom_screen();
-
-    // Oberen Bildschirm initialisieren
-    redraw_screen();
 
     while (aptMainLoop()) {
         hidScanInput();
@@ -313,7 +384,6 @@ int main(int argc, char **argv) {
             fetch_messages();
             if (isAdmin) fetch_reports();
             lastFetchTime = osGetTime();
-            redraw_screen();
         }
 
         if (!isKicked) {
@@ -335,7 +405,6 @@ int main(int argc, char **argv) {
                     }
                     fetch_messages();
                     if (isAdmin) fetch_reports();
-                    redraw_screen();
                 }
             }
 
@@ -343,7 +412,6 @@ int main(int argc, char **argv) {
             if ((kDown & KEY_B) && isAdmin) {
                 showAdminPanel = !showAdminPanel;
                 if(showAdminPanel) fetch_reports();
-                redraw_screen();
             }
 
             // ADMIN AKTIONEN IM ADMIN-PANEL
@@ -351,20 +419,17 @@ int main(int argc, char **argv) {
                 if (kDown & KEY_Y) {
                     firebase_delete("reports");
                     fetch_reports();
-                    redraw_screen();
                 }
 
                 if (kDown & KEY_L) {
                     firebase_delete("messages");
                     firebase_post("messages", "{\"user\":\"System\",\"text\":\"All messages cleared by Admin!\"}");
                     fetch_messages();
-                    redraw_screen();
                 }
 
                 if (kDown & KEY_R) {
                     firebase_delete("kicks");
                     firebase_post("messages", "{\"user\":\"System\",\"text\":\"All kick data cleared by Admin!\"}");
-                    redraw_screen();
                 }
             }
 
@@ -372,7 +437,7 @@ int main(int argc, char **argv) {
             if ((kDown & KEY_X) && strlen(username) > 0) {
                 if (showAdminPanel && isAdmin && !reportList.empty()) {
                     ReportItem rep = reportList[selectedReportIndex];
-                    
+
                     char kickPath[128];
                     snprintf(kickPath, sizeof(kickPath), "kicks/%s", rep.user.c_str());
                     firebase_put(kickPath, "{\"kicked\":true}");
@@ -382,7 +447,6 @@ int main(int argc, char **argv) {
                     firebase_post("messages", sysMsg);
 
                     fetch_reports();
-                    redraw_screen();
                 } else if (!showAdminPanel) {
                     char text[256] = "";
                     open_keyboard(text, sizeof(text), "Message...");
@@ -391,7 +455,6 @@ int main(int argc, char **argv) {
                         snprintf(payload, sizeof(payload), "{\"user\":\"%s\",\"text\":\"%s\"}", username, text);
                         firebase_post("messages", payload);
                         fetch_messages();
-                        redraw_screen();
                     }
                 }
             }
@@ -400,59 +463,66 @@ int main(int argc, char **argv) {
             if (kDown & KEY_DUP) {
                 if (showAdminPanel && selectedReportIndex > 0) {
                     selectedReportIndex--;
-                    redraw_screen();
                 } else if (!showAdminPanel && selectedMsgIndex > 0) {
                     selectedMsgIndex--;
-                    redraw_screen();
                 }
             }
             if (kDown & KEY_DDOWN) {
                 if (showAdminPanel && selectedReportIndex < (int)reportList.size() - 1) {
                     selectedReportIndex++;
-                    redraw_screen();
                 } else if (!showAdminPanel && selectedMsgIndex < (int)messageList.size() - 1) {
                     selectedMsgIndex++;
-                    redraw_screen();
                 }
             }
 
-            // REPORT SENDEN (Y - Mit Uno Reverse Schutz für den Admin)
+            // REPORT SENDEN (Y - Mit Uno Reverse Schutz fuer den Admin)
             if ((kDown & KEY_Y) && !messageList.empty() && strlen(username) > 0 && !showAdminPanel) {
                 ChatMessage selected = messageList[selectedMsgIndex];
                 char reason[128] = "";
                 open_keyboard(reason, sizeof(reason), "Report Reason...");
-                
+
                 if (strlen(reason) > 0) {
                     char reportPayload[512];
-                    
-                    // Schützt den Admin: Melder wird selbst gemeldet!
+
+                    // Schuetzt den Admin: Melder wird selbst gemeldet!
                     if (selected.user == "ADMIN") {
                         char customReason[256];
                         snprintf(customReason, sizeof(customReason), "[UNO REVERSE] Tried to report Admin! Reason: %s", reason);
-                        
-                        snprintf(reportPayload, sizeof(reportPayload), 
-                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}", 
+
+                        snprintf(reportPayload, sizeof(reportPayload),
+                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}",
                             username, selected.text.c_str(), customReason, username);
                     } else {
-                        snprintf(reportPayload, sizeof(reportPayload), 
-                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}", 
+                        snprintf(reportPayload, sizeof(reportPayload),
+                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}",
                             selected.user.c_str(), selected.text.c_str(), reason, username);
                     }
-                    
+
                     firebase_post("reports", reportPayload);
                 }
-                redraw_screen();
             }
         }
 
-        gfxFlushBuffers();
-        gfxSwapBuffers();
-        gspWaitForVBlank();
+        // ---- Zeichnen ----
+        C2D_TextBufClear(dynamicBuf);
+
+        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+            C2D_TargetClear(topTarget, C_WHITE);
+            C2D_SceneBegin(topTarget);
+            draw_top_screen();
+
+            C2D_TargetClear(bottomTarget, C_BG);
+            C2D_SceneBegin(bottomTarget);
+            draw_bottom_screen();
+        C3D_FrameEnd(0);
     }
 
     curl_global_cleanup();
     socExit();
     if (soc_buffer) free(soc_buffer);
+    C2D_TextBufDelete(dynamicBuf);
+    C2D_Fini();
+    C3D_Fini();
     gfxExit();
     return 0;
 }
