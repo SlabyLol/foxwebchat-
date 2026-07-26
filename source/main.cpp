@@ -275,6 +275,15 @@ static void draw_text(float x, float y, float scale, u32 color, const std::strin
     C2D_DrawText(&text, C2D_WithColor, x, y, 0.5f, scale, scale, color);
 }
 
+static void draw_text_centered(float centerX, float y, float scale, u32 color, const std::string& str) {
+    C2D_Text text;
+    C2D_TextParse(&text, dynamicBuf, str.c_str());
+    C2D_TextOptimize(&text);
+    float w, h;
+    C2D_TextGetDimensions(&text, scale, scale, &w, &h);
+    C2D_DrawText(&text, C2D_WithColor, centerX - w/2.0f, y, 0.5f, scale, scale, color);
+}
+
 // Fuchs-Kopf im flachen Stil (passend zu Icon & Banner), rein vektoriell gezeichnet
 static void draw_fox(float cx, float cy, float w) {
     // Ohren (aussen weiss)
@@ -395,12 +404,24 @@ static void draw_bottom_screen() {
 
     u32 updateColor = updateAvailable ? C2D_Color32(214,150,20,255) : C_MUTED;
     draw_text(16, 113, 0.36f, updateColor, updateStatus);
-    draw_text(16, 130, 0.30f, C_MUTED, "[SELECT] - Check for updates");
 
     draw_text(16, 154, 0.40f, C_DARK, "Controls:");
     draw_text(16, 172, 0.36f, C_MUTED, "D-Pad Up/Down - Select message");
     draw_text(16, 189, 0.36f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
     draw_text(16, 206, 0.36f, C_MUTED, "[START] - Exit");
+}
+
+// Vollflaechiger Splash-Screen (z.B. fuer den Update-Check beim Start)
+static void draw_splash_screen(const std::string& message, u32 messageColor) {
+    C2D_TargetClear(topTarget, C_BG);
+    C2D_SceneBegin(topTarget);
+    draw_fox(200, 90, 120);
+    draw_text_centered(200, 150, 0.62f, C_WHITE, "FoxWebChat");
+    draw_text_centered(200, 182, 0.44f, messageColor, message);
+
+    C2D_TargetClear(bottomTarget, C_MID);
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 110, 0.40f, C_WHITE, message);
 }
 
 int main(int argc, char **argv) {
@@ -419,17 +440,26 @@ int main(int argc, char **argv) {
     if (soc_buffer != NULL) socInit(soc_buffer, 0x100000);
     curl_global_init(CURL_GLOBAL_ALL);
 
+    // Splash-Screen waehrend des Update-Checks
+    C2D_TextBufClear(dynamicBuf);
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+        draw_splash_screen("Checking for Updates...", C_CREAM);
+    C3D_FrameEnd(0);
+
     check_for_updates();
+
+    // Ergebnis kurz anzeigen, bevor es in die App geht
+    C2D_TextBufClear(dynamicBuf);
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+        draw_splash_screen(updateStatus, updateAvailable ? C2D_Color32(255,225,120,255) : C_CREAM);
+    C3D_FrameEnd(0);
+    svcSleepThread(1200000000LL); // 1.2 Sekunden
 
     while (aptMainLoop()) {
         hidScanInput();
         u32 kDown = hidKeysDown();
 
         if (kDown & KEY_START) break;
-
-        if (kDown & KEY_SELECT) {
-            check_for_updates();
-        }
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
             check_kick_status();
