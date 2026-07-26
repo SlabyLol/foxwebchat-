@@ -23,8 +23,8 @@ ARCH        := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 CFLAGS      := -Wall -O2 -mword-relocations $(ARCH)
 CXXFLAGS    := $(CFLAGS) -fno-rtti -fno-exceptions
 
-LIBS        := -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lz -lctru -lm
-LIBDIRS     := $(CTRULIB) $(PORTLIBS_PATH)/3ds $(PORTLIBS_PATH)/armv6k
+LIBS        := -lcitro2d -lcitro3d -lcurl -lmbedtls -lmbedcrypto -lmbedx509 -lz -lctru -lm
+LIBDIRS     := $(CTRULIB) $(DEVKITPRO)/citro2d $(DEVKITPRO)/citro3d $(PORTLIBS_PATH)/3ds $(PORTLIBS_PATH)/armv6k
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
