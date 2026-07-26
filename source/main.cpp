@@ -6,6 +6,7 @@
 #include <malloc.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <curl/curl.h>
@@ -15,18 +16,59 @@
 #define UPDATE_CIA_URL "https://github.com/SlabyLol/foxwebchat-/releases/download/nightly/FoxWebChat.cia"
 #define UPDATE_CIA_DIR "sdmc:/3ds/FoxWebChat"
 #define UPDATE_CIA_PATH "sdmc:/3ds/FoxWebChat/FoxWebChat.cia"
+#define THEME_CFG_PATH "sdmc:/3ds/FoxWebChat/theme.cfg"
 
 // ---------------------------------------------------------------------
-// Farbpalette (passend zu Icon/Banner: warmes Orange, flaches Design)
+// Themes: mehrere Farbschemata, durchschaltbar mit D-Pad Links/Rechts
 // ---------------------------------------------------------------------
-#define C_BG        C2D_Color32(247,127,51,255)   // Haupt-Orange
-#define C_MID       C2D_Color32(225,90,35,255)    // dunkleres Orange (Akzent)
-#define C_WHITE     C2D_Color32(255,255,255,255)
-#define C_CREAM     C2D_Color32(255,247,240,255)
-#define C_DARK      C2D_Color32(61,33,26,255)      // Text / Augen
-#define C_SELECT_BG C2D_Color32(255,213,181,255)   // Auswahl-Hervorhebung
-#define C_ADMIN     C2D_Color32(214,40,40,255)
-#define C_MUTED     C2D_Color32(120,90,80,255)
+struct Theme {
+    const char* name;
+    u32 bg;        // Haupt-Akzentfarbe (Kopfzeile, unterer Bildschirm)
+    u32 mid;       // dunklere Akzentfarbe
+    u32 white;     // Fuchs / helle Flaechen
+    u32 cream;     // sekundaerer heller Text
+    u32 dark;      // Haupttext
+    u32 selectBg;  // Hervorhebung ausgewaehlter Zeilen
+    u32 admin;     // Admin-/Warnfarbe
+    u32 muted;     // gedaempfter Hinweistext
+};
+
+static const Theme THEMES[] = {
+    { "Orange",       C2D_Color32(247,127,51,255), C2D_Color32(225,90,35,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(255,247,240,255),
+                       C2D_Color32(61,33,26,255),   C2D_Color32(255,213,181,255),
+                       C2D_Color32(214,40,40,255),  C2D_Color32(120,90,80,255) },
+
+    { "Blau/Violett",  C2D_Color32(88,80,220,255),  C2D_Color32(58,50,168,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(238,236,255,255),
+                       C2D_Color32(28,24,58,255),   C2D_Color32(205,200,255,255),
+                       C2D_Color32(230,60,60,255),  C2D_Color32(150,145,195,255) },
+
+    { "Feuerrot",      C2D_Color32(210,58,40,255),  C2D_Color32(165,38,26,255),
+                       C2D_Color32(255,255,255,255), C2D_Color32(255,233,228,255),
+                       C2D_Color32(48,20,16,255),   C2D_Color32(255,190,175,255),
+                       C2D_Color32(255,205,0,255),  C2D_Color32(150,90,80,255) },
+
+    { "Dunkel",        C2D_Color32(38,38,44,255),   C2D_Color32(22,22,26,255),
+                       C2D_Color32(235,235,240,255), C2D_Color32(200,200,210,255),
+                       C2D_Color32(235,235,240,255), C2D_Color32(95,95,115,255),
+                       C2D_Color32(255,90,90,255),  C2D_Color32(150,150,162,255) },
+};
+static const int THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
+static int currentThemeIndex = 0;
+static const Theme* currentTheme = &THEMES[0];
+
+// ---------------------------------------------------------------------
+// Farbpalette - liest sich immer aus dem aktuell gewaehlten Theme
+// ---------------------------------------------------------------------
+#define C_BG        (currentTheme->bg)
+#define C_MID       (currentTheme->mid)
+#define C_WHITE     (currentTheme->white)
+#define C_CREAM     (currentTheme->cream)
+#define C_DARK      (currentTheme->dark)
+#define C_SELECT_BG (currentTheme->selectBg)
+#define C_ADMIN     (currentTheme->admin)
+#define C_MUTED     (currentTheme->muted)
 #define C_BLACK     C2D_Color32(0,0,0,255)
 
 struct ChatMessage {
@@ -51,6 +93,11 @@ std::vector<ReportItem> reportList;
 int selectedMsgIndex = 0;
 int selectedReportIndex = 0;
 u64 lastFetchTime = 0;
+
+// Auto-Scroll: solange true, springt die Auswahl bei neuen Nachrichten automatisch
+// zur neuesten Nachricht (wie bei einem normalen Chat). Wird deaktiviert, sobald
+// der Nutzer manuell nach oben scrollt, und wieder aktiviert, sobald er unten ankommt.
+static bool followLatestMsg = true;
 
 // ---------------------------------------------------------------------
 // citro2d Render-Ziele & Text-Puffer
@@ -147,6 +194,29 @@ static void ensure_dir(const char* path) {
     }
 }
 
+// Theme-Wahl auf der SD-Karte speichern / laden
+static void load_theme() {
+    FILE* fp = fopen(THEME_CFG_PATH, "r");
+    if (fp) {
+        int idx = -1;
+        if (fscanf(fp, "%d", &idx) == 1 && idx >= 0 && idx < THEME_COUNT) {
+            currentThemeIndex = idx;
+        }
+        fclose(fp);
+    }
+    currentTheme = &THEMES[currentThemeIndex];
+}
+
+static void save_theme() {
+    ensure_dir("sdmc:/3ds");
+    ensure_dir(UPDATE_CIA_DIR);
+    FILE* fp = fopen(THEME_CFG_PATH, "w");
+    if (fp) {
+        fprintf(fp, "%d", currentThemeIndex);
+        fclose(fp);
+    }
+}
+
 // Laedt die aktuelle .cia von der GitHub-Release-Seite herunter und speichert sie
 // unter /3ds/FoxWebChat/FoxWebChat.cia auf der SD-Karte.
 static bool download_update_cia(std::string& statusOut) {
@@ -227,48 +297,67 @@ std::string parse_json_value(const std::string& block, const std::string& key) {
 }
 
 void fetch_messages() {
+    int previousCount = (int)messageList.size();
+
     std::string json = firebase_get("messages");
     messageList.clear();
 
-    if(json.empty() || json == "null") return;
+    if(!(json.empty() || json == "null")) {
+        size_t pos = 0;
+        while ((pos = json.find("{", pos)) != std::string::npos) {
+            size_t endPos = json.find("}", pos);
+            if (endPos == std::string::npos) break;
 
-    size_t pos = 0;
-    while ((pos = json.find("{", pos)) != std::string::npos) {
-        size_t endPos = json.find("}", pos);
-        if (endPos == std::string::npos) break;
+            std::string block = json.substr(pos, endPos - pos + 1);
+            std::string text = parse_json_value(block, "text");
+            std::string user = parse_json_value(block, "user");
 
-        std::string block = json.substr(pos, endPos - pos + 1);
-        std::string text = parse_json_value(block, "text");
-        std::string user = parse_json_value(block, "user");
-
-        if (text != "Unknown") {
-            messageList.push_back({user, text});
+            if (text != "Unknown") {
+                messageList.push_back({user, text});
+            }
+            pos = endPos + 1;
         }
-        pos = endPos + 1;
     }
+
+    // Auto-Scroll: solange der Nutzer bei der neuesten Nachricht "mitliest",
+    // automatisch zur jeweils neuesten Nachricht springen.
+    if (followLatestMsg || selectedMsgIndex >= previousCount - 1) {
+        selectedMsgIndex = messageList.empty() ? 0 : (int)messageList.size() - 1;
+        followLatestMsg = true;
+    }
+
+    if (selectedMsgIndex >= (int)messageList.size()) {
+        selectedMsgIndex = messageList.empty() ? 0 : (int)messageList.size() - 1;
+    }
+    if (selectedMsgIndex < 0) selectedMsgIndex = 0;
 }
 
 void fetch_reports() {
     std::string json = firebase_get("reports");
     reportList.clear();
 
-    if(json.empty() || json == "null") return;
+    if(!(json.empty() || json == "null")) {
+        size_t pos = 0;
+        while ((pos = json.find("{", pos)) != std::string::npos) {
+            size_t endPos = json.find("}", pos);
+            if (endPos == std::string::npos) break;
 
-    size_t pos = 0;
-    while ((pos = json.find("{", pos)) != std::string::npos) {
-        size_t endPos = json.find("}", pos);
-        if (endPos == std::string::npos) break;
+            std::string block = json.substr(pos, endPos - pos + 1);
+            std::string user = parse_json_value(block, "reportedUser");
+            std::string text = parse_json_value(block, "messageText");
+            std::string reason = parse_json_value(block, "reason");
 
-        std::string block = json.substr(pos, endPos - pos + 1);
-        std::string user = parse_json_value(block, "reportedUser");
-        std::string text = parse_json_value(block, "messageText");
-        std::string reason = parse_json_value(block, "reason");
-
-        if (user != "Unknown") {
-            reportList.push_back({user, text, reason});
+            if (user != "Unknown") {
+                reportList.push_back({user, text, reason});
+            }
+            pos = endPos + 1;
         }
-        pos = endPos + 1;
     }
+
+    if (selectedReportIndex >= (int)reportList.size()) {
+        selectedReportIndex = reportList.empty() ? 0 : (int)reportList.size() - 1;
+    }
+    if (selectedReportIndex < 0) selectedReportIndex = 0;
 }
 
 #ifndef APP_VERSION_STR
@@ -382,11 +471,13 @@ static void draw_fox(float cx, float cy, float w) {
 static void draw_top_screen() {
     const float SCREEN_W = 400.0f;
     const float HEADER_H = 34.0f;
+    const float LIST_BOTTOM = 230.0f;
+    const int ROW_H = 18;
 
     // Kopfzeile
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
     draw_text(8, 8, 0.62f, C_WHITE, "FoxWebChat");
-        
+
     std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
     if (isAdmin) statusLine += "  (ADMIN)";
     draw_text(150, 12, 0.48f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
@@ -414,14 +505,29 @@ static void draw_top_screen() {
         if (reportList.empty()) {
             draw_text(8, y, 0.48f, C_MUTED, "No active reports.");
         } else {
-            for (size_t i = 0; i < reportList.size() && y < 230; i++) {
-                bool sel = (int)i == selectedReportIndex;
+            int total = (int)reportList.size();
+            int maxVisible = std::max(1, (int)((LIST_BOTTOM - y) / ROW_H));
+            int scrollOffset = 0;
+            if (total > maxVisible) {
+                scrollOffset = selectedReportIndex - maxVisible + 1;
+                if (scrollOffset < 0) scrollOffset = 0;
+                int maxOffset = total - maxVisible;
+                if (scrollOffset > maxOffset) scrollOffset = maxOffset;
+
+                char counter[32];
+                snprintf(counter, sizeof(counter), "%d-%d/%d", scrollOffset + 1, std::min(total, scrollOffset + maxVisible), total);
+                draw_text(SCREEN_W - 70, y - 16, 0.32f, C_MUTED, counter);
+            }
+            int endIdx = std::min(total, scrollOffset + maxVisible);
+
+            for (int i = scrollOffset; i < endIdx; i++) {
+                bool sel = i == selectedReportIndex;
                 if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
                 std::string line = "[" + reportList[i].user + "]: \"" +
                     truncate_text(reportList[i].text, 28) + "\" (" +
                     truncate_text(reportList[i].reason, 18) + ")";
                 draw_text(8, y, 0.42f, sel ? C_MID : C_DARK, line);
-                y += 18;
+                y += ROW_H;
             }
         }
         return;
@@ -438,12 +544,27 @@ static void draw_top_screen() {
     if (messageList.empty()) {
         draw_text(8, y, 0.48f, C_MUTED, "No messages available.");
     } else {
-        for (size_t i = 0; i < messageList.size() && y < 230; i++) {
-            bool sel = (int)i == selectedMsgIndex;
+        int total = (int)messageList.size();
+        int maxVisible = std::max(1, (int)((LIST_BOTTOM - y) / ROW_H));
+        int scrollOffset = 0;
+        if (total > maxVisible) {
+            scrollOffset = selectedMsgIndex - maxVisible + 1;
+            if (scrollOffset < 0) scrollOffset = 0;
+            int maxOffset = total - maxVisible;
+            if (scrollOffset > maxOffset) scrollOffset = maxOffset;
+
+            char counter[32];
+            snprintf(counter, sizeof(counter), "%d-%d/%d", scrollOffset + 1, std::min(total, scrollOffset + maxVisible), total);
+            draw_text(SCREEN_W - 70, y - 16, 0.32f, C_MUTED, counter);
+        }
+        int endIdx = std::min(total, scrollOffset + maxVisible);
+
+        for (int i = scrollOffset; i < endIdx; i++) {
+            bool sel = i == selectedMsgIndex;
             if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
             std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, 42);
             draw_text(8, y, 0.44f, sel ? C_MID : C_DARK, line);
-            y += 18;
+            y += ROW_H;
         }
     }
 }
@@ -460,17 +581,18 @@ static void draw_bottom_screen() {
     draw_text(90, 8, 0.62f, C_WHITE, "FoxWebChat");
     draw_text(90, 34, 0.40f, C_CREAM, "DarkFox Co.");
 
-    draw_text(16, 74, 0.42f, C_DARK, "Web Edition:");
-    draw_text(16, 93, 0.36f, C_MUTED, "slabylol.github.io/foxwebchat-/");
+    draw_text(16, 68, 0.38f, C_DARK, "Web Edition:");
+    draw_text(16, 85, 0.32f, C_MUTED, "slabylol.github.io/foxwebchat-/");
 
     u32 updateColor = updateAvailable ? C2D_Color32(214,150,20,255) : C_MUTED;
-    draw_text(16, 113, 0.36f, updateColor, updateStatus);
+    draw_text(16, 102, 0.34f, updateColor, updateStatus);
 
-    draw_text(16, 154, 0.40f, C_DARK, "Controls:");
-    draw_text(16, 172, 0.36f, C_MUTED, "D-Pad Up/Down - Select message");
-    draw_text(16, 189, 0.36f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
-    draw_text(16, 206, 0.36f, C_MUTED, "[START] - Exit");
-    draw_text(16, 223, 0.40f, C_DARK, "Unfair kick?: Contact darkfox.tobias@outlook.com");
+    draw_text(16, 122, 0.38f, C_DARK, "Controls:");
+    draw_text(16, 138, 0.32f, C_MUTED, "D-Pad Up/Down: Select   L/R: Theme");
+    draw_text(16, 154, 0.32f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
+    draw_text(16, 170, 0.32f, C_MUTED, "[START] - Exit");
+    draw_text(16, 186, 0.32f, C_MUTED, std::string("Theme: ") + currentTheme->name);
+    draw_text(16, 206, 0.28f, C_MUTED, "Unfair kick?: Contact darkfox.tobias@outlook.com");
 }
 
 // Vollflaechiger Splash-Screen (z.B. fuer den Update-Check beim Start)
@@ -486,7 +608,7 @@ static void draw_splash_screen(const std::string& message, u32 messageColor) {
     draw_text_centered(160, 110, 0.40f, C_WHITE, message);
 }
 
-// Bestaetigungs-Screen: "Update available" (schwarzer Text) + (A) Yes / (B) No
+// Bestaetigungs-Screen: "Update available" (schwarzer Text) + (A) Download / (B) Exit
 static void draw_update_prompt() {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
@@ -544,6 +666,8 @@ int main(int argc, char **argv) {
     topTarget = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     dynamicBuf = C2D_TextBufNew(4096);
+
+    load_theme();
 
     // Sockets & CURL initialisieren
     u32 *soc_buffer = (u32*)memalign(0x1000, 0x100000);
@@ -624,8 +748,20 @@ int main(int argc, char **argv) {
         if (kDown & KEY_START) break;
 
         if ((kDown & KEY_SELECT) && isAdmin) {
-        firebase_post("messages", "{\"user\":\"System\",\"text\":\"Something....\"}");
-    };
+            firebase_post("messages", "{\"user\":\"System\",\"text\":\"Something....\"}");
+        }
+
+        // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
+        if (kDown & KEY_DRIGHT) {
+            currentThemeIndex = (currentThemeIndex + 1) % THEME_COUNT;
+            currentTheme = &THEMES[currentThemeIndex];
+            save_theme();
+        }
+        if (kDown & KEY_DLEFT) {
+            currentThemeIndex = (currentThemeIndex - 1 + THEME_COUNT) % THEME_COUNT;
+            currentTheme = &THEMES[currentThemeIndex];
+            save_theme();
+        }
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
             check_kick_status();
@@ -702,17 +838,19 @@ int main(int argc, char **argv) {
                         char payload[512];
                         snprintf(payload, sizeof(payload), "{\"user\":\"%s\",\"text\":\"%s\"}", username, text);
                         firebase_post("messages", payload);
+                        followLatestMsg = true;
                         fetch_messages();
                     }
                 }
             }
 
-            // NAVIGATION
+            // NAVIGATION (deaktiviert Auto-Scroll, sobald man manuell nach oben blaettert)
             if (kDown & KEY_DUP) {
                 if (showAdminPanel && selectedReportIndex > 0) {
                     selectedReportIndex--;
                 } else if (!showAdminPanel && selectedMsgIndex > 0) {
                     selectedMsgIndex--;
+                    followLatestMsg = false;
                 }
             }
             if (kDown & KEY_DDOWN) {
@@ -720,6 +858,7 @@ int main(int argc, char **argv) {
                     selectedReportIndex++;
                 } else if (!showAdminPanel && selectedMsgIndex < (int)messageList.size() - 1) {
                     selectedMsgIndex++;
+                    if (selectedMsgIndex == (int)messageList.size() - 1) followLatestMsg = true;
                 }
             }
 
