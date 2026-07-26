@@ -4,12 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <malloc.h>
+#include <sys/stat.h>
+#include <errno.h>
 #include <vector>
 #include <string>
 #include <curl/curl.h>
 
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
 #define ADMIN_CODE "AdminJs93€=no"
+#define UPDATE_CIA_URL "https://github.com/SlabyLol/foxwebchat-/releases/download/nightly/FoxWebChat.cia"
+#define UPDATE_CIA_DIR "sdmc:/3ds/FoxWebChat"
+#define UPDATE_CIA_PATH "sdmc:/3ds/FoxWebChat/FoxWebChat.cia"
 
 // ---------------------------------------------------------------------
 // Farbpalette (passend zu Icon/Banner: warmes Orange, flaches Design)
@@ -134,6 +139,61 @@ void firebase_delete(const char* path) {
         curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }
+}
+
+static void ensure_dir(const char* path) {
+    if (mkdir(path, 0777) != 0 && errno != EEXIST) {
+        // ignorieren - falls es wirklich fehlschlaegt, scheitert der spaetere fopen() ohnehin
+    }
+}
+
+// Laedt die aktuelle .cia von der GitHub-Release-Seite herunter und speichert sie
+// unter /3ds/FoxWebChat/FoxWebChat.cia auf der SD-Karte.
+static bool download_update_cia(std::string& statusOut) {
+    ensure_dir("sdmc:/3ds");
+    ensure_dir(UPDATE_CIA_DIR);
+
+    FILE* fp = fopen(UPDATE_CIA_PATH, "wb");
+    if (!fp) {
+        statusOut = "Could not open file for writing";
+        return false;
+    }
+
+    CURL* curl = curl_easy_init();
+    bool ok = false;
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, UPDATE_CIA_URL);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+
+        CURLcode res = curl_easy_perform(curl);
+        long httpCode = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+
+        if (res == CURLE_OK && httpCode == 200) {
+            ok = true;
+        } else if (res != CURLE_OK) {
+            statusOut = std::string("curl error: ") + curl_easy_strerror(res);
+        } else {
+            statusOut = "HTTP " + std::to_string(httpCode);
+        }
+
+        curl_easy_cleanup(curl);
+    } else {
+        statusOut = "curl init failed";
+    }
+
+    fclose(fp);
+
+    if (!ok) {
+        remove(UPDATE_CIA_PATH);
+    }
+    return ok;
 }
 
 void check_kick_status() {
@@ -440,19 +500,37 @@ static void draw_update_prompt() {
     draw_text_centered(160, 130, 0.42f, C_WHITE, "(A) Yes    (B) No");
 }
 
-// Hinweis-Screen mit der Download-Seite, nachdem (A) Yes gedrueckt wurde
-static void draw_update_download_info() {
+// Waehrend des Downloads
+static void draw_downloading_screen() {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
-    draw_text_centered(200, 80, 0.46f, C_WHITE, "Open this page to download:");
-    draw_text_centered(200, 112, 0.40f, C_CREAM, "github.com/SlabyLol/foxwebchat-");
-    draw_text_centered(200, 134, 0.40f, C_CREAM, "/releases/tag/nightly");
-    draw_text_centered(200, 176, 0.36f, C_MUTED, "Install the .cia with FBI, then");
-    draw_text_centered(200, 194, 0.36f, C_MUTED, "press any button to continue");
+    draw_fox(200, 90, 110);
+    draw_text_centered(200, 150, 0.58f, C_WHITE, "FoxWebChat");
+    draw_text_centered(200, 182, 0.44f, C_CREAM, "Downloading update...");
 
     C2D_TargetClear(bottomTarget, C_MID);
     C2D_SceneBegin(bottomTarget);
-    draw_text_centered(160, 110, 0.40f, C_WHITE, "Press A / B / START to continue");
+    draw_text_centered(160, 110, 0.40f, C_WHITE, "Please wait...");
+}
+
+// Ergebnis des Downloads
+static void draw_download_result(bool success, const std::string& detail) {
+    C2D_TargetClear(topTarget, C_BG);
+    C2D_SceneBegin(topTarget);
+    draw_text_centered(200, 74, 0.50f, success ? C_WHITE : C2D_Color32(255,140,140,255),
+                        success ? "Download complete!" : "Download failed");
+    if (!success) {
+        draw_text_centered(200, 104, 0.36f, C_CREAM, detail);
+    }
+    if (success) {
+        draw_text_centered(200, 140, 0.38f, C_CREAM, "Saved to:");
+        draw_text_centered(200, 164, 0.34f, C_WHITE, "/3ds/FoxWebChat/FoxWebChat.cia");
+        draw_text_centered(200, 196, 0.34f, C_MUTED, "Install it with FBI, then relaunch.");
+    }
+
+    C2D_TargetClear(bottomTarget, C_MID);
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 110, 0.40f, C_WHITE, "Press any button to continue");
 }
 
 int main(int argc, char **argv) {
@@ -492,17 +570,26 @@ int main(int argc, char **argv) {
             C3D_FrameEnd(0);
 
             if (kd & KEY_A) {
-                bool showingInfo = true;
-                while (showingInfo && aptMainLoop()) {
+                // Download-Screen anzeigen, waehrend heruntergeladen wird
+                C2D_TextBufClear(dynamicBuf);
+                C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                    draw_downloading_screen();
+                C3D_FrameEnd(0);
+
+                std::string errorDetail;
+                bool success = download_update_cia(errorDetail);
+
+                bool showingResult = true;
+                while (showingResult && aptMainLoop()) {
                     hidScanInput();
                     u32 kd2 = hidKeysDown();
 
                     C2D_TextBufClear(dynamicBuf);
                     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-                        draw_update_download_info();
+                        draw_download_result(success, errorDetail);
                     C3D_FrameEnd(0);
 
-                    if (kd2 & (KEY_A | KEY_B | KEY_START)) showingInfo = false;
+                    if (kd2 & (KEY_A | KEY_B | KEY_START)) showingResult = false;
                 }
                 waitingForChoice = false;
             } else if (kd & KEY_B) {
