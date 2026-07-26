@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoxWebChat Theme Creator</title>
+<link rel="icon" type="image/png" href="resources/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page-bg: #fdf3ec;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Poppins', Arial, sans-serif;
+    background: var(--page-bg);
+    color: #3d211a;
+    margin: 0;
+    padding: 24px 16px 60px;
+  }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  header img {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  header h1 {
+    font-size: 22px;
+    margin: 0;
+  }
+
+  header p {
+    margin: 2px 0 0;
+    color: #8a6a5e;
+    font-size: 14px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 18px rgba(61, 33, 26, 0.08);
+  }
+
+  .card h2 {
+    font-size: 16px;
+    margin: 0 0 14px;
+    color: #d67f33;
+  }
+
+  .field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1e5dc;
+    gap: 12px;
+  }
+
+  .field:last-child { border-bottom: none; }
+
+  .field label {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .field small {
+    display: block;
+    font-weight: 400;
+    color: #a08477;
+    font-size: 11px;
+  }
+
+  .field input[type="color"] {
+    width: 44px;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+    cursor: pointer;
+    background: none;
+  }
+
+  .name-field input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #eddcd0;
+    font-family: inherit;
+    font-size: 14px;
+  }
+
+  /* ---- Preview ---- */
+  .preview-shell {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #eddcd0;
+  }
+
+  .preview-header {
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .preview-body {
+    padding: 14px;
+    min-height: 150px;
+  }
+
+  .preview-row {
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .preview-row.selected { font-weight: 600; }
+
+  .preview-hint {
+    font-size: 11px;
+    margin-top: 10px;
+  }
+
+  .preview-footer {
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+
+  .preview-fox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .preview-fox svg { width: 40px; height: 40px; flex-shrink: 0; }
+
+  .actions {
+    margin-top: 18px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 14px;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    cursor: pointer;
+  }
+
+  #downloadBtn {
+    background: #d67f33;
+    color: white;
+  }
+  #downloadBtn:hover { background: #c56f26; }
+
+  #randomBtn {
+    background: #fff0e4;
+    color: #d67f33;
+  }
+  #randomBtn:hover { background: #ffe4cd; }
+
+  .howto {
+    margin-top: 26px;
+    font-size: 13px;
+    color: #8a6a5e;
+    line-height: 1.6;
+  }
+
+  .howto code {
+    background: #fff0e4;
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: #b5672a;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <img src="resources/icon.png" alt="FoxWebChat">
+    <div>
+      <h1>FoxWebChat Theme Creator</h1>
+      <p>Build your own color scheme and download it as a .fwct file</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="card">
+      <h2>Colors</h2>
+
+      <div class="field name-field" style="display:block; border-bottom:none; padding-bottom:14px;">
+        <label for="themeName">Theme name<br><small>shown inside the app</small></label>
+        <input type="text" id="themeName" value="My Theme" maxlength="24" style="margin-top:6px;">
+      </div>
+
+      <div class="field">
+        <label>Main color (bg)<br><small>header bar, bottom screen</small></label>
+        <input type="color" id="c_bg" value="#f77f33">
+      </div>
+      <div class="field">
+        <label>Accent color (mid)<br><small>darker shade of the main color</small></label>
+        <input type="color" id="c_mid" value="#e15a23">
+      </div>
+      <div class="field">
+        <label>White (white)<br><small>fox, bright areas</small></label>
+        <input type="color" id="c_white" value="#ffffff">
+      </div>
+      <div class="field">
+        <label>Cream (cream)<br><small>secondary light text</small></label>
+        <input type="color" id="c_cream" value="#fff7f0">
+      </div>
+      <div class="field">
+        <label>Text (dark)<br><small>main text</small></label>
+        <input type="color" id="c_dark" value="#3d211a">
+      </div>
+      <div class="field">
+        <label>Selection (selectBg)<br><small>highlight for the selected row</small></label>
+        <input type="color" id="c_selectBg" value="#ffd5b5">
+      </div>
+      <div class="field">
+        <label>Muted (muted)<br><small>hint text</small></label>
+        <input type="color" id="c_muted" value="#785a50">
+      </div>
+
+      <div class="actions">
+        <button id="downloadBtn">Download .fwct</button>
+        <button id="randomBtn">Random theme</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Live preview</h2>
+      <div class="preview-shell">
+        <div class="preview-header" id="pv_header">FoxWebChat</div>
+        <div class="preview-body" id="pv_body">
+          <div class="preview-fox">
+            <svg viewBox="0 0 100 100">
+              <polygon id="pv_ear1" points="27,15 15,45 42,35" />
+              <polygon id="pv_ear2" points="73,15 85,45 58,35" />
+              <ellipse id="pv_head" cx="50" cy="52" rx="30" ry="26" />
+              <circle id="pv_eye1" cx="38" cy="50" r="4" />
+              <circle id="pv_eye2" cx="62" cy="50" r="4" />
+            </svg>
+            <div>
+              <div style="font-weight:700;" id="pv_title">FoxWebChat</div>
+              <div style="font-size:12px;" id="pv_sub">DarkFox Co.</div>
+            </div>
+          </div>
+
+          <div class="preview-row selected" id="pv_row1">[Alex]: Hey, how's it going? :)</div>
+          <div class="preview-row" id="pv_row2">[System]: Alex joined</div>
+          <div class="preview-hint" id="pv_hint">D-Pad: Select   (X) Send   (Y) Report</div>
+        </div>
+        <div class="preview-footer" id="pv_footer" style="background:#e15a23; color:white;">
+          Theme: <span id="pv_name">My Theme</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="howto">
+    Next steps: download the file, copy it onto your SD card under
+    <code>/3ds/FoxWebChat/themes/</code> kopieren, then launch FoxWebChat and use
+    D-Pad Left/Right to cycle through themes &mdash; your own one shows up automatically
+    as well.
+  </div>
+</div>
+
+<script>
+function hexToRgb(hex) {
+  hex = hex.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  return `${r},${g},${b}`;
+}
+
+const fields = ['bg', 'mid', 'white', 'cream', 'dark', 'selectBg', 'muted'];
+
+function currentValues() {
+  const vals = {};
+  fields.forEach(f => vals[f] = document.getElementById('c_' + f).value);
+  vals.name = document.getElementById('themeName').value.trim() || 'My Theme';
+  return vals;
+}
+
+function updatePreview() {
+  const v = currentValues();
+
+  document.getElementById('pv_header').style.background = v.bg;
+  document.getElementById('pv_header').style.color = v.white;
+
+  document.getElementById('pv_body').style.background = v.white;
+  document.getElementById('pv_body').style.color = v.dark;
+
+  document.getElementById('pv_row1').style.background = v.selectBg;
+  document.getElementById('pv_row1').style.color = v.mid;
+  document.getElementById('pv_row2').style.color = v.dark;
+  document.getElementById('pv_hint').style.color = v.muted;
+
+  document.getElementById('pv_footer').style.background = v.mid;
+  document.getElementById('pv_footer').style.color = v.white;
+  document.getElementById('pv_name').textContent = v.name;
+
+  document.getElementById('pv_title').style.color = v.dark;
+  document.getElementById('pv_sub').style.color = v.muted;
+
+  ['pv_ear1', 'pv_ear2', 'pv_head'].forEach(id => {
+    document.getElementById(id).setAttribute('fill', v.white);
+  });
+  document.getElementById('pv_eye1').setAttribute('fill', v.dark);
+  document.getElementById('pv_eye2').setAttribute('fill', v.dark);
+}
+
+document.querySelectorAll('input').forEach(el => {
+  el.addEventListener('input', updatePreview);
+});
+
+function downloadTheme() {
+  const v = currentValues();
+  const safeFileName = v.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'theme';
+
+  let content = '# FoxWebChat theme file (.fwct)\n';
+  content += '# Created with the FoxWebChat Theme Creator\n';
+  content += `name=${v.name}\n`;
+  fields.forEach(f => {
+    content += `${f}=${hexToRgb(v[f])}\n`;
+  });
+
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeFileName}.fwct`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function randomTheme() {
+  function randHex() {
+    return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+  }
+  const bg = randHex();
+  document.getElementById('c_bg').value = bg;
+  document.getElementById('c_mid').value = randHex();
+  document.getElementById('c_white').value = '#ffffff';
+  document.getElementById('c_cream').value = '#fff7f0';
+  document.getElementById('c_dark').value = '#2a1a14';
+  document.getElementById('c_selectBg').value = randHex();
+  document.getElementById('c_muted').value = randHex();
+  updatePreview();
+}
+
+document.getElementById('downloadBtn').addEventListener('click', downloadTheme);
+document.getElementById('randomBtn').addEventListener('click', randomTheme);
+document.getElementById('themeName').addEventListener('input', updatePreview);
+
+updatePreview();
+</script>
+
+</body>
+</html>
