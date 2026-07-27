@@ -828,6 +828,7 @@ static void draw_top_screen() {
     if (showSecret) {
         draw_text(8, y, 0.55f, C_ADMIN, "You found the secret code send it to darkfox.tobias@outlook.com for a prize!"; y += 22;
         draw_text(8, y, 0.44f, C_BLACK, "FWC83h"; y += 16;
+        return;
     }
     
     if (strlen(username) == 0) {
@@ -1220,7 +1221,7 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        if ((kDown & KEY_SELECT) && (kDown & KEY_A)) {
+        if ((kDown & KEY_SELECT && kDown & KEY_A) {
             showSecret = !showSecret;
         }
 
