@@ -13,7 +13,7 @@ body:
         
         Note: It may take some time for your submission to be reviewed and processed.
 
-  - type: text
+  - type: textarea
     id: theme_name
     attributes:
       label: Theme Name
