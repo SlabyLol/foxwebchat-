@@ -1,0 +1,10 @@
+# FoxWebChat theme file (.fwct)
+# Created with the FoxWebChat Theme Creator
+name=DarkMatter
+bg=43,27,38
+mid=88,57,125
+white=255,255,255
+cream=255,247,240
+dark=42,26,20
+selectBg=146,199,76
+muted=64,93,231
