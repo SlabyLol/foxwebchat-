@@ -1,0 +1,10 @@
+# FoxWebChat theme file (.fwct)
+# Created with the FoxWebChat Theme Creator
+name=hotsummer
+bg=91,232,255
+mid=125,121,0
+white=192,254,255
+cream=255,247,240
+dark=42,26,20
+selectBg=251,255,17
+muted=0,0,0
