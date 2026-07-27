@@ -810,7 +810,6 @@ static void draw_top_screen() {
     const float HEADER_H = 34.0f;
     const float LIST_BOTTOM = 230.0f;
     const int ROW_H = 18;
-
     // Kopfzeile
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
     draw_text(8, 8, 0.62f, C_WHITE, "FoxWebChat");
@@ -826,6 +825,11 @@ static void draw_top_screen() {
         return;
     }
 
+    if (showSecret) {
+        draw_text(8, y, 0.55f, C_ADMIN, "You found the secret code send it to darkfox.tobias@outlook.com for a prize!"; y += 22;
+        draw_text(8, y, 0.44f, C_BLACK, "FWC83h"; y += 16;
+    }
+    
     if (strlen(username) == 0) {
         draw_text(20, 60, 0.58f, C_DARK, "Press (A) to enter name / join");
         draw_text(20, 88, 0.48f, C_MUTED, "Press [START] to exit");
@@ -838,6 +842,7 @@ static void draw_top_screen() {
         draw_text(8, y, 0.55f, C_ADMIN, "=== ADMIN PANEL ==="); y += 22;
         draw_text(8, y, 0.44f, C_MUTED, "(B) Close  (X) Kick  (Y) Clear Reports"); y += 16;
         draw_text(8, y, 0.44f, C_MUTED, "(L) Clear Messages  (R) Unban All"); y += 20;
+
 
         if (reportList.empty()) {
             draw_text(8, y, 0.48f, C_MUTED, "No active reports.");
@@ -1215,8 +1220,8 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        if ((kDown & KEY_SELECT) && isAdmin) {
-            firebase_post("messages", "{\"user\":\"ERROR_CODE\",\"text\":\"socket_post failed ERR:EF8\"}");
+        if (kDown & KEY_SELECT) && (kDown & KEY_A) {
+            showSecret = !showSecret;
         }
 
         // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
