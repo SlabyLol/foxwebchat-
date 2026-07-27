@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <dirent.h>
+#include <cctype>
+#include <utility>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -129,6 +131,30 @@ static bool followLatestMsg = true;
 static C3D_RenderTarget* topTarget;
 static C3D_RenderTarget* bottomTarget;
 static C2D_TextBuf dynamicBuf;
+
+// Fortschrittsanzeige fuer Downloads (Update-CIA, Theme-Dateien). Definition weiter unten,
+// hier nur vorab bekanntmachen, da sie schon von den Download-Funktionen gebraucht wird.
+static void draw_progress_screen(const std::string& label, float progress);
+
+static float g_downloadProgress = 0.0f;   // 0.0 .. 1.0
+static std::string g_downloadLabel = "Downloading...";
+
+// Wird von libcurl waehrend eines Downloads regelmaessig aufgerufen, aktualisiert
+// den Fortschritt und zeichnet direkt einen neuen Frame - so bewegt sich der Balken
+// auch waehrend des (blockierenden) curl_easy_perform().
+static int curl_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
+                                   curl_off_t ultotal, curl_off_t ulnow) {
+    if (dltotal > 0) {
+        g_downloadProgress = (float)dlnow / (float)dltotal;
+    }
+
+    C2D_TextBufClear(dynamicBuf);
+    C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+        draw_progress_screen(g_downloadLabel, g_downloadProgress);
+    C3D_FrameEnd(0);
+
+    return 0; // != 0 wuerde den Download abbrechen
+}
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -367,6 +393,9 @@ static bool download_update_cia(std::string& statusOut) {
         return false;
     }
 
+    g_downloadProgress = 0.0f;
+    g_downloadLabel = "Downloading update...";
+
     CURL* curl = curl_easy_init();
     bool ok = false;
 
@@ -378,6 +407,8 @@ static bool download_update_cia(std::string& statusOut) {
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curl_progress_callback);
 
         CURLcode res = curl_easy_perform(curl);
         long httpCode = 0;
@@ -400,6 +431,174 @@ static bool download_update_cia(std::string& statusOut) {
 
     if (!ok) {
         remove(UPDATE_CIA_PATH);
+    }
+    return ok;
+}
+
+// ---------------------------------------------------------------------
+// Themes von GitHub: prueft themes/ im Repo und bietet neue .fwct-Dateien
+// zum Download an.
+// ---------------------------------------------------------------------
+#define GITHUB_THEMES_API_URL "https://api.github.com/repos/SlabyLol/foxwebchat-/contents/themes"
+
+struct RemoteTheme {
+    std::string name;
+    std::string downloadUrl;
+};
+static std::vector<RemoteTheme> pendingNewThemes;
+
+std::string github_get(const std::string& url) {
+    CURL *curl = curl_easy_init();
+    std::string readBuffer = "";
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "FoxWebChat-3DS");
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 8L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 4L);
+
+        curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+    }
+    return readBuffer;
+}
+
+// Sucht in einem GitHub-Contents-JSON alle "name"/"download_url"-Paare in Reihenfolge.
+// Bewusst ohne echtes JSON-Parsing (verschachtelte "_links"-Objekte wuerden ein
+// klammerbasiertes Parsen zerschiessen) - GitHub liefert "name" immer vor "download_url".
+static std::vector<std::pair<std::string, std::string>> parse_name_download_pairs(const std::string& json) {
+    std::vector<std::pair<std::string, std::string>> result;
+    size_t pos = 0;
+
+    while (true) {
+        size_t namePos = json.find("\"name\"", pos);
+        if (namePos == std::string::npos) break;
+
+        size_t colon = json.find(":", namePos);
+        size_t q1 = json.find("\"", colon);
+        size_t q2 = (q1 == std::string::npos) ? std::string::npos : json.find("\"", q1 + 1);
+        if (colon == std::string::npos || q1 == std::string::npos || q2 == std::string::npos) break;
+        std::string name = json.substr(q1 + 1, q2 - q1 - 1);
+
+        size_t dlPos = json.find("\"download_url\"", q2);
+        if (dlPos == std::string::npos) break;
+        size_t colon2 = json.find(":", dlPos);
+        if (colon2 == std::string::npos) break;
+
+        size_t searchStart = colon2 + 1;
+        while (searchStart < json.size() && isspace((unsigned char)json[searchStart])) searchStart++;
+
+        std::string downloadUrl;
+        if (json.compare(searchStart, 4, "null") != 0) {
+            size_t dq1 = json.find("\"", colon2);
+            size_t dq2 = (dq1 == std::string::npos) ? std::string::npos : json.find("\"", dq1 + 1);
+            if (dq1 != std::string::npos && dq2 != std::string::npos) {
+                downloadUrl = json.substr(dq1 + 1, dq2 - dq1 - 1);
+            }
+        }
+
+        result.push_back({name, downloadUrl});
+        pos = dlPos + 1;
+    }
+
+    return result;
+}
+
+static std::vector<std::string> list_local_theme_files() {
+    std::vector<std::string> files;
+    DIR* d = opendir(CUSTOM_THEMES_DIR);
+    if (!d) return files;
+
+    struct dirent* entry;
+    while ((entry = readdir(d)) != NULL) {
+        std::string fname = entry->d_name;
+        if (fname.size() > 5 && fname.substr(fname.size() - 5) == ".fwct") {
+            files.push_back(fname);
+        }
+    }
+    closedir(d);
+    return files;
+}
+
+// Vergleicht die Themes im GitHub-Repo mit den lokal vorhandenen .fwct-Dateien
+// und fuellt pendingNewThemes mit allem, was noch fehlt.
+void check_for_new_themes() {
+    pendingNewThemes.clear();
+    ensure_custom_themes_dir();
+
+    std::string json = github_get(GITHUB_THEMES_API_URL);
+    if (json.empty()) return;
+
+    auto pairs = parse_name_download_pairs(json);
+    auto localFiles = list_local_theme_files();
+
+    for (auto& p : pairs) {
+        const std::string& name = p.first;
+        const std::string& url = p.second;
+
+        if (name.size() <= 5 || name.substr(name.size() - 5) != ".fwct") continue;
+        if (url.empty()) continue;
+
+        bool existsLocally = false;
+        for (auto& lf : localFiles) {
+            if (lf == name) { existsLocally = true; break; }
+        }
+        if (!existsLocally) {
+            pendingNewThemes.push_back({name, url});
+        }
+    }
+}
+
+// Laedt eine einzelne per GitHub gefundene Theme-Datei in CUSTOM_THEMES_DIR herunter.
+static bool download_theme_file(const RemoteTheme& theme, std::string& statusOut) {
+    ensure_custom_themes_dir();
+    std::string outPath = std::string(CUSTOM_THEMES_DIR) + "/" + theme.name;
+
+    FILE* fp = fopen(outPath.c_str(), "wb");
+    if (!fp) {
+        statusOut = "Could not open file for writing";
+        return false;
+    }
+
+    CURL* curl = curl_easy_init();
+    bool ok = false;
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, theme.downloadUrl.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "FoxWebChat-3DS");
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 8L);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curl_progress_callback);
+
+        CURLcode res = curl_easy_perform(curl);
+        long httpCode = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+
+        if (res == CURLE_OK && httpCode == 200) {
+            ok = true;
+        } else if (res != CURLE_OK) {
+            statusOut = std::string("curl error: ") + curl_easy_strerror(res);
+        } else {
+            statusOut = "HTTP " + std::to_string(httpCode);
+        }
+
+        curl_easy_cleanup(curl);
+    } else {
+        statusOut = "curl init failed";
+    }
+
+    fclose(fp);
+
+    if (!ok) {
+        remove(outPath.c_str());
     }
     return ok;
 }
@@ -761,17 +960,76 @@ static void draw_update_prompt() {
     draw_text_centered(160, 130, 0.42f, C_WHITE, "(A) Download   (B) Exit");
 }
 
-// Waehrend des Downloads
-static void draw_downloading_screen() {
+// Fortschrittsbalken - waehrend Update- oder Theme-Downloads
+static void draw_progress_screen(const std::string& label, float progress) {
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
-    draw_fox(200, 90, 110);
-    draw_text_centered(200, 150, 0.58f, C_WHITE, "FoxWebChat");
-    draw_text_centered(200, 182, 0.44f, C_CREAM, "Downloading update...");
+    draw_fox(200, 74, 90);
+    draw_text_centered(200, 122, 0.54f, C_WHITE, "FoxWebChat");
+    draw_text_centered(200, 156, 0.40f, C_CREAM, label);
+
+    float barW = 260.0f, barH = 16.0f;
+    float barX = 200.0f - barW / 2.0f, barY = 180.0f;
+    C2D_DrawRectSolid(barX, barY, 0.5f, barW, barH, C2D_Color32(255,255,255,90));
+    C2D_DrawRectSolid(barX, barY, 0.5f, barW * progress, barH, C_WHITE);
+
+    char pctBuf[8];
+    snprintf(pctBuf, sizeof(pctBuf), "%d%%", (int)(progress * 100.0f));
+    draw_text_centered(200, 204, 0.36f, C_CREAM, pctBuf);
 
     C2D_TargetClear(bottomTarget, C_MID);
     C2D_SceneBegin(bottomTarget);
     draw_text_centered(160, 110, 0.40f, C_WHITE, "Please wait...");
+}
+
+// Prompt: neue Themes auf GitHub gefunden, die lokal noch fehlen
+static void draw_new_themes_prompt() {
+    C2D_TargetClear(topTarget, C_BG);
+    C2D_SceneBegin(topTarget);
+    draw_fox(200, 56, 76);
+    draw_text_centered(200, 98, 0.48f, C_WHITE, "New themes available!");
+
+    float ly = 128;
+    int shown = 0;
+    for (size_t i = 0; i < pendingNewThemes.size(); i++) {
+        if (shown >= 5) {
+            draw_text_centered(200, ly, 0.32f, C_MUTED, "...and more");
+            break;
+        }
+        std::string fname = pendingNewThemes[i].name;
+        std::string label = (fname.size() > 5) ? fname.substr(0, fname.size() - 5) : fname;
+        draw_text_centered(200, ly, 0.36f, C_DARK, label);
+        ly += 16;
+        shown++;
+    }
+
+    C2D_TargetClear(bottomTarget, C_MID);
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 90, 0.44f, C_WHITE, "Download new themes?");
+    draw_text_centered(160, 126, 0.40f, C_WHITE, "(A) Download   (B) Skip");
+}
+
+// Ergebnis-Screen nach dem Herunterladen neuer Themes
+static void draw_theme_download_result(bool success, int downloadedCount, const std::string& detail) {
+    C2D_TargetClear(topTarget, C_BG);
+    C2D_SceneBegin(topTarget);
+    draw_text_centered(200, 90, 0.50f, success ? C_WHITE : C2D_Color32(255,140,140,255),
+                        success ? "Themes downloaded!" : "Theme download failed");
+    if (success) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%d new theme(s) added.", downloadedCount);
+        draw_text_centered(200, 124, 0.38f, C_CREAM, buf);
+        draw_text_centered(200, 156, 0.34f, C_MUTED, "Use D-Pad Left/Right to try them.");
+    } else {
+        draw_text_centered(200, 124, 0.36f, C_CREAM, detail);
+    }
+
+    C2D_TargetClear(bottomTarget, C_MID);
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 110, 0.40f, C_WHITE, "Press any button to continue");
 }
 
 // Ergebnis des Downloads
@@ -835,10 +1093,12 @@ int main(int argc, char **argv) {
             C3D_FrameEnd(0);
 
             if (kd & KEY_A) {
-                // Download-Screen anzeigen, waehrend heruntergeladen wird
+                // Progress-Screen anzeigen, waehrend heruntergeladen wird
+                g_downloadProgress = 0.0f;
+                g_downloadLabel = "Downloading update...";
                 C2D_TextBufClear(dynamicBuf);
                 C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-                    draw_downloading_screen();
+                    draw_progress_screen(g_downloadLabel, g_downloadProgress);
                 C3D_FrameEnd(0);
 
                 std::string errorDetail;
@@ -878,6 +1138,75 @@ int main(int argc, char **argv) {
             draw_splash_screen(updateStatus, C_CREAM);
         C3D_FrameEnd(0);
         svcSleepThread(1200000000LL); // 1.2 Sekunden
+
+        // Nach neuen Themes im GitHub-Repo suchen (themes/*.fwct)
+        C2D_TextBufClear(dynamicBuf);
+        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+            draw_splash_screen("Checking for new themes...", C_CREAM);
+        C3D_FrameEnd(0);
+
+        check_for_new_themes();
+
+        if (!pendingNewThemes.empty()) {
+            bool waitingThemeChoice = true;
+            while (waitingThemeChoice && aptMainLoop()) {
+                hidScanInput();
+                u32 kdTheme = hidKeysDown();
+
+                C2D_TextBufClear(dynamicBuf);
+                C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                    draw_new_themes_prompt();
+                C3D_FrameEnd(0);
+
+                if (kdTheme & KEY_A) {
+                    int downloadedCount = 0;
+                    std::string lastError;
+                    bool allOk = true;
+
+                    for (size_t i = 0; i < pendingNewThemes.size(); i++) {
+                        char label[64];
+                        snprintf(label, sizeof(label), "Theme %d/%d: %s",
+                                 (int)(i + 1), (int)pendingNewThemes.size(), pendingNewThemes[i].name.c_str());
+                        g_downloadLabel = label;
+                        g_downloadProgress = 0.0f;
+
+                        C2D_TextBufClear(dynamicBuf);
+                        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                            draw_progress_screen(g_downloadLabel, g_downloadProgress);
+                        C3D_FrameEnd(0);
+
+                        std::string err;
+                        if (download_theme_file(pendingNewThemes[i], err)) {
+                            downloadedCount++;
+                        } else {
+                            allOk = false;
+                            lastError = err;
+                        }
+                    }
+
+                    // Theme-Liste neu aufbauen, damit die neuen Themes sofort verfuegbar sind
+                    init_themes();
+                    if (currentThemeIndex >= (int)allThemes.size()) currentThemeIndex = 0;
+                    currentTheme = &allThemes[currentThemeIndex];
+
+                    bool showingResult = true;
+                    while (showingResult && aptMainLoop()) {
+                        hidScanInput();
+                        u32 kdResult = hidKeysDown();
+
+                        C2D_TextBufClear(dynamicBuf);
+                        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                            draw_theme_download_result(allOk, downloadedCount, lastError);
+                        C3D_FrameEnd(0);
+
+                        if (kdResult & (KEY_A | KEY_B | KEY_START)) showingResult = false;
+                    }
+                    waitingThemeChoice = false;
+                } else if (kdTheme & KEY_B) {
+                    waitingThemeChoice = false;
+                }
+            }
+        }
     }
 
     while (aptMainLoop()) {
