@@ -142,7 +142,7 @@ static std::string g_downloadLabel = "Downloading...";
 // Wird von libcurl waehrend eines Downloads regelmaessig aufgerufen, aktualisiert
 // den Fortschritt und zeichnet direkt einen neuen Frame - so bewegt sich der Balken
 // auch waehrend des (blockierenden) curl_easy_perform().
-static int curl_progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
+static int xfer_progress_cb(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
                                    curl_off_t ultotal, curl_off_t ulnow) {
     if (dltotal > 0) {
         g_downloadProgress = (float)dlnow / (float)dltotal;
@@ -408,7 +408,7 @@ static bool download_update_cia(std::string& statusOut) {
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 120L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curl_progress_callback);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xfer_progress_cb);
 
         CURLcode res = curl_easy_perform(curl);
         long httpCode = 0;
@@ -576,7 +576,7 @@ static bool download_theme_file(const RemoteTheme& theme, std::string& statusOut
         curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
         curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 8L);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, curl_progress_callback);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, xfer_progress_cb);
 
         CURLcode res = curl_easy_perform(curl);
         long httpCode = 0;
