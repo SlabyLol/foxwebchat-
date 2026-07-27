@@ -68,7 +68,6 @@ body:
     id: ownership
     attributes:
       label: Ownership & Rights
-      description: Please confirm your rights to this theme
       options:
         - label: I am the owner of the made .fwct file or I have allowance to submit this file
           required: true
