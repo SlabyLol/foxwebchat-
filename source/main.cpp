@@ -16,6 +16,7 @@
 
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
 #define ADMIN_CODE "AdminJs93€=no"
+#define TECHNOBLADE_JOIN_TEXT "The Legend is here.... TECHNOBLADE JOINED"
 #define UPDATE_CIA_URL "https://github.com/SlabyLol/foxwebchat-/releases/download/nightly/FoxWebChat.cia"
 #define UPDATE_CIA_DIR "sdmc:/3ds/FoxWebChat"
 #define UPDATE_CIA_PATH "sdmc:/3ds/FoxWebChat/FoxWebChat.cia"
@@ -23,69 +24,91 @@
 #define CUSTOM_THEMES_DIR "sdmc:/3ds/FoxWebChat/themes"
 
 // ---------------------------------------------------------------------
-// Themes: mehrere Farbschemata, durchschaltbar mit D-Pad Links/Rechts.
-// Eigene Themes koennen als .fwct-Dateien in CUSTOM_THEMES_DIR abgelegt werden.
+// Themes: multiple color schemes, switchable with D-Pad Left/Right.
+// Custom themes can be dropped as .fwct files into CUSTOM_THEMES_DIR.
 // ---------------------------------------------------------------------
 struct Theme {
     std::string name;
-    u32 bg;        // Haupt-Akzentfarbe (Kopfzeile, unterer Bildschirm)
-    u32 mid;       // dunklere Akzentfarbe
-    u32 white;     // Fuchs / helle Flaechen
-    u32 cream;     // sekundaerer heller Text
-    u32 dark;      // Haupttext
-    u32 selectBg;  // Hervorhebung ausgewaehlter Zeilen
-    u32 admin;     // Admin-/Warnfarbe
-    u32 muted;     // gedaempfter Hinweistext
+    u32 bg;        // Main accent color (header bar, bottom screen)
+    u32 mid;       // Darker accent shade
+    u32 white;     // Fox / bright areas
+    u32 cream;     // Secondary light text
+    u32 dark;      // Main text (top screen)
+    u32 selectBg;  // Highlight for the selected row
+    u32 admin;     // Admin/warning color
+    u32 muted;     // Muted hint text
+    u32 textColor; // Text on the bottom screen (Web Edition, Controls, etc.)
 };
 
 static const Theme THEMES[] = {
     { "Orange",       C2D_Color32(247,127,51,255), C2D_Color32(225,90,35,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(255,247,240,255),
                        C2D_Color32(61,33,26,255),   C2D_Color32(255,213,181,255),
-                       C2D_Color32(214,40,40,255),  C2D_Color32(120,90,80,255) },
+                       C2D_Color32(214,40,40,255),  C2D_Color32(120,90,80,255),
+                       C2D_Color32(61,33,26,255) },
 
     { "Blau/Violett",  C2D_Color32(88,80,220,255),  C2D_Color32(58,50,168,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(238,236,255,255),
                        C2D_Color32(28,24,58,255),   C2D_Color32(205,200,255,255),
-                       C2D_Color32(230,60,60,255),  C2D_Color32(150,145,195,255) },
+                       C2D_Color32(230,60,60,255),  C2D_Color32(150,145,195,255),
+                       C2D_Color32(28,24,58,255) },
 
     { "Feuerrot",      C2D_Color32(210,58,40,255),  C2D_Color32(165,38,26,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(255,233,228,255),
                        C2D_Color32(48,20,16,255),   C2D_Color32(255,190,175,255),
-                       C2D_Color32(255,205,0,255),  C2D_Color32(150,90,80,255) },
+                       C2D_Color32(255,205,0,255),  C2D_Color32(150,90,80,255),
+                       C2D_Color32(48,20,16,255) },
 
     { "Dunkel",        C2D_Color32(38,38,44,255),   C2D_Color32(22,22,26,255),
                        C2D_Color32(235,235,240,255), C2D_Color32(200,200,210,255),
                        C2D_Color32(235,235,240,255), C2D_Color32(95,95,115,255),
-                       C2D_Color32(255,90,90,255),  C2D_Color32(150,150,162,255) },
+                       C2D_Color32(255,90,90,255),  C2D_Color32(150,150,162,255),
+                       C2D_Color32(235,235,240,255) },
 
     { "Wald",          C2D_Color32(60,140,70,255),  C2D_Color32(38,105,50,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(235,250,236,255),
                        C2D_Color32(24,45,28,255),   C2D_Color32(195,235,200,255),
-                       C2D_Color32(214,40,40,255),  C2D_Color32(120,155,125,255) },
+                       C2D_Color32(214,40,40,255),  C2D_Color32(120,155,125,255),
+                       C2D_Color32(24,45,28,255) },
 
     { "Pastell",       C2D_Color32(240,150,190,255), C2D_Color32(215,110,155,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(255,240,247,255),
                        C2D_Color32(70,30,48,255),   C2D_Color32(255,215,232,255),
-                       C2D_Color32(214,40,40,255),  C2D_Color32(180,120,150,255) },
+                       C2D_Color32(214,40,40,255),  C2D_Color32(180,120,150,255),
+                       C2D_Color32(70,30,48,255) },
 
     { "Sonnenschein",  C2D_Color32(250,190,40,255), C2D_Color32(220,155,10,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(255,248,225,255),
                        C2D_Color32(70,52,10,255),   C2D_Color32(255,232,170,255),
-                       C2D_Color32(214,40,40,255),  C2D_Color32(150,130,80,255) },
+                       C2D_Color32(214,40,40,255),  C2D_Color32(150,130,80,255),
+                       C2D_Color32(70,52,10,255) },
 
     { "Tuerkis",       C2D_Color32(35,170,165,255), C2D_Color32(20,125,120,255),
                        C2D_Color32(255,255,255,255), C2D_Color32(228,252,250,255),
                        C2D_Color32(15,55,53,255),   C2D_Color32(180,240,236,255),
-                       C2D_Color32(230,60,60,255),  C2D_Color32(110,160,158,255) },
+                       C2D_Color32(230,60,60,255),  C2D_Color32(110,160,158,255),
+                       C2D_Color32(15,55,53,255) },
 };
 static const int THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
-static std::vector<Theme> allThemes;  // eingebaute Themes + geladene .fwct-Dateien
+static std::vector<Theme> allThemes;  // built-in themes + loaded .fwct files
 static int currentThemeIndex = 0;
-static const Theme* currentTheme = &THEMES[0];  // wird in main() auf &allThemes[...] umgebogen
+static const Theme* currentTheme = &THEMES[0];  // repointed to &allThemes[...] in main()
+
+// Hidden bonus theme - not part of THEMES[], only added to allThemes once unlocked
+// via the SELECT+L secret combo (see main()).
+static const Theme SECRET_THEME = {
+    "\u2728 Secret Fox \u2728",
+    C2D_Color32(212,175,55,255),  C2D_Color32(30,20,10,255),
+    C2D_Color32(255,255,255,255), C2D_Color32(255,248,225,255),
+    C2D_Color32(40,30,10,255),   C2D_Color32(255,223,120,255),
+    C2D_Color32(214,40,40,255),  C2D_Color32(150,120,60,255),
+    C2D_Color32(40,30,10,255)
+};
+#define SECRET_FLAG_PATH "sdmc:/3ds/FoxWebChat/.secret_unlocked"
+static bool secretThemeUnlocked = false;
 
 // ---------------------------------------------------------------------
-// Farbpalette - liest sich immer aus dem aktuell gewaehlten Theme
+// Color palette - always reads from the currently selected theme
 // ---------------------------------------------------------------------
 #define C_BG        (currentTheme->bg)
 #define C_MID       (currentTheme->mid)
@@ -95,6 +118,7 @@ static const Theme* currentTheme = &THEMES[0];  // wird in main() auf &allThemes
 #define C_SELECT_BG (currentTheme->selectBg)
 #define C_ADMIN     (currentTheme->admin)
 #define C_MUTED     (currentTheme->muted)
+#define C_TEXT      (currentTheme->textColor)
 #define C_BLACK     C2D_Color32(0,0,0,255)
 
 struct ChatMessage {
@@ -120,28 +144,28 @@ int selectedMsgIndex = 0;
 int selectedReportIndex = 0;
 u64 lastFetchTime = 0;
 
-// Auto-Scroll: solange true, springt die Auswahl bei neuen Nachrichten automatisch
-// zur neuesten Nachricht (wie bei einem normalen Chat). Wird deaktiviert, sobald
-// der Nutzer manuell nach oben scrollt, und wieder aktiviert, sobald er unten ankommt.
+// Auto-scroll: while true, the selection automatically jumps to the newest
+// message whenever new ones arrive (like a normal chat). Gets disabled as soon
+// as the user manually scrolls up, and re-enabled once they reach the bottom again.
 static bool followLatestMsg = true;
 
 // ---------------------------------------------------------------------
-// citro2d Render-Ziele & Text-Puffer
+// citro2d render targets & text buffer
 // ---------------------------------------------------------------------
 static C3D_RenderTarget* topTarget;
 static C3D_RenderTarget* bottomTarget;
 static C2D_TextBuf dynamicBuf;
 
-// Fortschrittsanzeige fuer Downloads (Update-CIA, Theme-Dateien). Definition weiter unten,
-// hier nur vorab bekanntmachen, da sie schon von den Download-Funktionen gebraucht wird.
+// Progress display for downloads (update CIA, theme files). Defined further down,
+// only forward-declared here since the download functions already need it.
 static void draw_progress_screen(const std::string& label, float progress);
 
 static float g_downloadProgress = 0.0f;   // 0.0 .. 1.0
 static std::string g_downloadLabel = "Downloading...";
 
-// Wird von libcurl waehrend eines Downloads regelmaessig aufgerufen, aktualisiert
-// den Fortschritt und zeichnet direkt einen neuen Frame - so bewegt sich der Balken
-// auch waehrend des (blockierenden) curl_easy_perform().
+// Called regularly by libcurl during a download; updates the progress value
+// and draws a new frame right away, so the bar keeps moving even during the
+// (blocking) curl_easy_perform() call.
 static int xfer_progress_cb(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
                                    curl_off_t ultotal, curl_off_t ulnow) {
     if (dltotal > 0) {
@@ -153,7 +177,7 @@ static int xfer_progress_cb(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
         draw_progress_screen(g_downloadLabel, g_downloadProgress);
     C3D_FrameEnd(0);
 
-    return 0; // != 0 wuerde den Download abbrechen
+    return 0; // non-zero would abort the download
 }
 
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
@@ -240,24 +264,26 @@ void firebase_delete(const char* path) {
 
 static void ensure_dir(const char* path) {
     if (mkdir(path, 0777) != 0 && errno != EEXIST) {
-        // ignorieren - falls es wirklich fehlschlaegt, scheitert der spaetere fopen() ohnehin
+        // ignore - if this genuinely fails, the later fopen() will fail anyway
     }
 }
 
-// Parst eine einzelne "r,g,b"-Zeile aus einer .fwct-Datei
+// Parses a single "r,g,b(,a)" line from a .fwct file
 static bool parse_fwct_color(const std::string& value, u32& outColor) {
-    int r = 0, g = 0, b = 0;
-    if (sscanf(value.c_str(), "%d,%d,%d", &r, &g, &b) == 3) {
+    int r = 0, g = 0, b = 0, a = 255;
+    int n = sscanf(value.c_str(), "%d,%d,%d,%d", &r, &g, &b, &a);
+    if (n == 3 || n == 4) {
         r = std::max(0, std::min(255, r));
         g = std::max(0, std::min(255, g));
         b = std::max(0, std::min(255, b));
-        outColor = C2D_Color32(r, g, b, 255);
+        a = std::max(0, std::min(255, a));
+        outColor = C2D_Color32(r, g, b, a);
         return true;
     }
     return false;
 }
 
-// Laedt eine einzelne .fwct-Datei. Fehlende Zeilen behalten den Wert von "base" (Fallback: Orange-Theme).
+// Loads a single .fwct file. Missing lines keep the value from "base" (fallback: Orange theme).
 static bool load_fwct_file(const std::string& path, const Theme& base, Theme& outTheme) {
     FILE* fp = fopen(path.c_str(), "r");
     if (!fp) return false;
@@ -285,6 +311,7 @@ static bool load_fwct_file(const std::string& path, const Theme& base, Theme& ou
         else if (key == "dark"       && parse_fwct_color(val, col)) { t.dark = col; gotAny = true; }
         else if (key == "selectBg"   && parse_fwct_color(val, col)) { t.selectBg = col; gotAny = true; }
         else if (key == "muted"      && parse_fwct_color(val, col)) { t.muted = col; gotAny = true; }
+        else if (key == "textColor"  && parse_fwct_color(val, col)) { t.textColor = col; gotAny = true; }
     }
     fclose(fp);
 
@@ -293,8 +320,8 @@ static bool load_fwct_file(const std::string& path, const Theme& base, Theme& ou
     return true;
 }
 
-// Legt das Theme-Verzeichnis an und schreibt beim allerersten Start eine Beispiel-Datei,
-// damit man direkt sieht, wie ein eigenes .fwct-Theme aussehen muss.
+// Creates the theme directory and, on the very first launch, writes an example file
+// so it's immediately clear what a custom .fwct theme should look like.
 static void ensure_custom_themes_dir() {
     ensure_dir("sdmc:/3ds");
     ensure_dir(UPDATE_CIA_DIR);
@@ -308,10 +335,10 @@ static void ensure_custom_themes_dir() {
         FILE* fp = fopen(examplePath.c_str(), "w");
         if (fp) {
             fprintf(fp,
-                "# FoxWebChat Theme-Datei (.fwct)\n"
-                "# Farben als r,g,b (0-255). Zeilen mit # sind Kommentare.\n"
-                "# Diese Datei kopieren, umbenennen und Werte anpassen fuer ein eigenes Theme.\n"
-                "name=Mein Theme\n"
+                "# FoxWebChat theme file (.fwct)\n"
+                "# Colors as R,G,B,A (0-255, A optional, defaults to 255). Lines starting with # are comments.\n"
+                "# Copy this file, rename it, and tweak the values to make your own theme.\n"
+                "name=My Theme\n"
                 "bg=247,127,51\n"
                 "mid=225,90,35\n"
                 "white=255,255,255\n"
@@ -319,13 +346,14 @@ static void ensure_custom_themes_dir() {
                 "dark=61,33,26\n"
                 "selectBg=255,213,181\n"
                 "muted=120,90,80\n"
+                "textColor=61,33,26\n"
             );
             fclose(fp);
         }
     }
 }
 
-// Durchsucht CUSTOM_THEMES_DIR nach .fwct-Dateien und haengt gueltige Themes an allThemes an.
+// Scans CUSTOM_THEMES_DIR for .fwct files and appends valid themes to allThemes.
 static void load_custom_themes() {
     ensure_custom_themes_dir();
 
@@ -338,7 +366,7 @@ static void load_custom_themes() {
         if (fname.size() <= 5) continue;
         if (fname.substr(fname.size() - 5) != ".fwct") continue;
 
-        Theme t = THEMES[0]; // Orange als Basis fuer fehlende Werte
+        Theme t = THEMES[0]; // Orange as the base for any missing values
         t.name = fname.substr(0, fname.size() - 5);
 
         std::string fullPath = std::string(CUSTOM_THEMES_DIR) + "/" + fname;
@@ -350,14 +378,42 @@ static void load_custom_themes() {
     closedir(d);
 }
 
-// Baut die komplette Theme-Liste (eingebaut + eigene) auf. Vor load_theme() aufrufen.
+// Builds the full theme list (built-in + custom). Call before load_theme().
+// Checks whether the secret theme has been unlocked before (marker file on SD card)
+#define SECRET_FLAG_MAGIC "FWCT-SECRET-9f2c"
+
+static void load_secret_flag() {
+    FILE* fp = fopen(SECRET_FLAG_PATH, "r");
+    if (fp) {
+        char buf[32] = {0};
+        fread(buf, 1, sizeof(buf) - 1, fp);
+        fclose(fp);
+        if (strcmp(buf, SECRET_FLAG_MAGIC) == 0) {
+            secretThemeUnlocked = true;
+        }
+    }
+}
+
+static void unlock_secret_theme() {
+    if (secretThemeUnlocked) return;
+    secretThemeUnlocked = true;
+    ensure_dir("sdmc:/3ds");
+    ensure_dir(UPDATE_CIA_DIR);
+    FILE* fp = fopen(SECRET_FLAG_PATH, "w");
+    if (fp) {
+        fprintf(fp, "%s", SECRET_FLAG_MAGIC);
+        fclose(fp);
+    }
+}
+
 static void init_themes() {
     allThemes.clear();
     for (int i = 0; i < THEME_COUNT; i++) allThemes.push_back(THEMES[i]);
     load_custom_themes();
+    if (secretThemeUnlocked) allThemes.push_back(SECRET_THEME);
 }
 
-// Theme-Wahl auf der SD-Karte speichern / laden
+// Save / load the theme selection on the SD card
 static void load_theme() {
     FILE* fp = fopen(THEME_CFG_PATH, "r");
     if (fp) {
@@ -381,8 +437,8 @@ static void save_theme() {
     }
 }
 
-// Laedt die aktuelle .cia von der GitHub-Release-Seite herunter und speichert sie
-// unter /3ds/FoxWebChat/FoxWebChat.cia auf der SD-Karte.
+// Downloads the current .cia from the GitHub release page and saves it
+// to /3ds/FoxWebChat/FoxWebChat.cia on the SD card.
 static bool download_update_cia(std::string& statusOut) {
     ensure_dir("sdmc:/3ds");
     ensure_dir(UPDATE_CIA_DIR);
@@ -436,8 +492,8 @@ static bool download_update_cia(std::string& statusOut) {
 }
 
 // ---------------------------------------------------------------------
-// Themes von GitHub: prueft themes/ im Repo und bietet neue .fwct-Dateien
-// zum Download an.
+// Themes from GitHub: checks the repo's themes/ folder and offers to
+// download any new .fwct files.
 // ---------------------------------------------------------------------
 #define GITHUB_THEMES_API_URL "https://api.github.com/repos/SlabyLol/foxwebchat-/contents/themes"
 
@@ -466,9 +522,9 @@ std::string github_get(const std::string& url) {
     return readBuffer;
 }
 
-// Sucht in einem GitHub-Contents-JSON alle "name"/"download_url"-Paare in Reihenfolge.
-// Bewusst ohne echtes JSON-Parsing (verschachtelte "_links"-Objekte wuerden ein
-// klammerbasiertes Parsen zerschiessen) - GitHub liefert "name" immer vor "download_url".
+// Finds all "name"/"download_url" pairs in a GitHub contents JSON, in order.
+// Deliberately not a real JSON parser (nested "_links" objects would break
+// brace-based parsing) - GitHub always emits "name" before "download_url".
 static std::vector<std::pair<std::string, std::string>> parse_name_download_pairs(const std::string& json) {
     std::vector<std::pair<std::string, std::string>> result;
     size_t pos = 0;
@@ -523,8 +579,8 @@ static std::vector<std::string> list_local_theme_files() {
     return files;
 }
 
-// Vergleicht die Themes im GitHub-Repo mit den lokal vorhandenen .fwct-Dateien
-// und fuellt pendingNewThemes mit allem, was noch fehlt.
+// Compares the themes in the GitHub repo against the locally present .fwct files
+// and fills pendingNewThemes with anything still missing.
 void check_for_new_themes() {
     pendingNewThemes.clear();
     ensure_custom_themes_dir();
@@ -552,7 +608,7 @@ void check_for_new_themes() {
     }
 }
 
-// Laedt eine einzelne per GitHub gefundene Theme-Datei in CUSTOM_THEMES_DIR herunter.
+// Downloads a single theme file found via GitHub into CUSTOM_THEMES_DIR.
 static bool download_theme_file(const RemoteTheme& theme, std::string& statusOut) {
     ensure_custom_themes_dir();
     std::string outPath = std::string(CUSTOM_THEMES_DIR) + "/" + theme.name;
@@ -656,8 +712,8 @@ void fetch_messages() {
         }
     }
 
-    // Auto-Scroll: solange der Nutzer bei der neuesten Nachricht "mitliest",
-    // automatisch zur jeweils neuesten Nachricht springen.
+    // Auto-scroll: as long as the user is "following" the latest message,
+    // automatically jump to whichever message is newest.
     if (followLatestMsg || selectedMsgIndex >= previousCount - 1) {
         selectedMsgIndex = messageList.empty() ? 0 : (int)messageList.size() - 1;
         followLatestMsg = true;
@@ -711,8 +767,8 @@ static std::string strip_quotes(const std::string& s) {
     return s;
 }
 
-// Erwartet in Firebase unter dem Pfad "version" einen simplen String-Wert,
-// z.B. per Firebase-Konsole: version: "1.0.1"
+// Expects a simple string value under the "version" path in Firebase,
+// e.g. set via the Firebase console: version: "1.0.1"
 void check_for_updates() {
     updateStatus = "Checking for updates...";
     std::string json = firebase_get("version");
@@ -747,7 +803,7 @@ void open_keyboard(char* out_text, size_t max_len, const char* hint) {
 }
 
 // ---------------------------------------------------------------------
-// Zeichen-Helfer
+// Drawing helpers
 // ---------------------------------------------------------------------
 
 static std::string truncate_text(const std::string& s, size_t maxLen) {
@@ -771,46 +827,47 @@ static void draw_text_centered(float centerX, float y, float scale, u32 color, c
     C2D_DrawText(&text, C2D_WithColor, centerX - w/2.0f, y, 0.5f, scale, scale, color);
 }
 
-// Fuchs-Kopf im flachen Stil (passend zu Icon & Banner), rein vektoriell gezeichnet
+// Fox head in a flat style (matching the icon & banner), drawn purely with vectors
 static void draw_fox(float cx, float cy, float w) {
-    // Ohren (aussen weiss)
+    // Ears (white outside)
     C2D_DrawTriangle(cx-w*0.46f, cy-w*0.62f, C_WHITE,
                       cx-w*0.62f, cy-w*0.14f, C_WHITE,
                       cx-w*0.08f, cy-w*0.30f, C_WHITE, 0.5f);
     C2D_DrawTriangle(cx+w*0.46f, cy-w*0.62f, C_WHITE,
                       cx+w*0.62f, cy-w*0.14f, C_WHITE,
                       cx+w*0.08f, cy-w*0.30f, C_WHITE, 0.5f);
-    // Ohren innen (Akzentfarbe)
+    // Inner ears (accent color)
     C2D_DrawTriangle(cx-w*0.40f, cy-w*0.46f, C_MID,
                       cx-w*0.49f, cy-w*0.22f, C_MID,
                       cx-w*0.20f, cy-w*0.30f, C_MID, 0.5f);
     C2D_DrawTriangle(cx+w*0.40f, cy-w*0.46f, C_MID,
                       cx+w*0.49f, cy-w*0.22f, C_MID,
                       cx+w*0.20f, cy-w*0.30f, C_MID, 0.5f);
-    // Kopf
+    // Head
     C2D_DrawEllipseSolid(cx - w*0.72f/2, cy - w*0.02f - w*0.62f/2, 0.5f, w*0.72f, w*0.62f, C_WHITE);
-    // Schnauze
+    // Muzzle
     C2D_DrawTriangle(cx-w*0.14f, cy+w*0.02f, C_BG,
                       cx+w*0.14f, cy+w*0.02f, C_BG,
                       cx,         cy+w*0.30f, C_BG, 0.5f);
-    // Augen
+    // Eyes
     C2D_DrawCircleSolid(cx-w*0.16f, cy-w*0.02f, 0.5f, w*0.045f, C_DARK);
     C2D_DrawCircleSolid(cx+w*0.16f, cy-w*0.02f, 0.5f, w*0.045f, C_DARK);
-    // Nase
+    // Nose
     C2D_DrawTriangle(cx-w*0.045f, cy+w*0.14f, C_DARK,
                       cx+w*0.045f, cy+w*0.14f, C_DARK,
                       cx,          cy+w*0.14f+w*0.045f*1.3f, C_DARK, 0.5f);
 }
 
 // ---------------------------------------------------------------------
-// Oberer Bildschirm: Titel, Statuszeilen, Nachrichten-/Report-Liste
+// Top screen: title, status lines, message/report list
 // ---------------------------------------------------------------------
 static void draw_top_screen() {
     const float SCREEN_W = 400.0f;
     const float HEADER_H = 34.0f;
     const float LIST_BOTTOM = 230.0f;
     const int ROW_H = 18;
-    // Kopfzeile
+
+    // Header bar
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
     draw_text(8, 8, 0.62f, C_WHITE, "FoxWebChat");
 
@@ -825,7 +882,6 @@ static void draw_top_screen() {
         return;
     }
 
-    
     if (strlen(username) == 0) {
         draw_text(20, 60, 0.58f, C_DARK, "Press (A) to enter name / join");
         draw_text(20, 88, 0.48f, C_MUTED, "Press [START] to exit");
@@ -838,7 +894,6 @@ static void draw_top_screen() {
         draw_text(8, y, 0.55f, C_ADMIN, "=== ADMIN PANEL ==="); y += 22;
         draw_text(8, y, 0.44f, C_MUTED, "(B) Close  (X) Kick  (Y) Clear Reports"); y += 16;
         draw_text(8, y, 0.44f, C_MUTED, "(L) Clear Messages  (R) Unban All"); y += 20;
-
 
         if (reportList.empty()) {
             draw_text(8, y, 0.48f, C_MUTED, "No active reports.");
@@ -901,14 +956,19 @@ static void draw_top_screen() {
             bool sel = i == selectedMsgIndex;
             if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
             std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, 42);
-            draw_text(8, y, 0.44f, sel ? C_MID : C_DARK, line);
+
+            bool isTechnobladeJoin = (messageList[i].user == "System") &&
+                                      (messageList[i].text == TECHNOBLADE_JOIN_TEXT);
+            u32 lineColor = isTechnobladeJoin ? C2D_Color32(220,30,30,255) : (sel ? C_MID : C_DARK);
+
+            draw_text(8, y, 0.44f, lineColor, line);
             y += ROW_H;
         }
     }
 }
 
 // ---------------------------------------------------------------------
-// Unterer Bildschirm: Branding (Fuchs, Wortmarke, Link, Steuerung)
+// Bottom screen: branding (fox, wordmark, link, controls)
 // ---------------------------------------------------------------------
 static void draw_bottom_screen() {
     const float SCREEN_W = 320.0f;
@@ -917,23 +977,23 @@ static void draw_bottom_screen() {
 
     draw_fox(48, 30, 64);
     draw_text(90, 8, 0.62f, C_WHITE, "FoxWebChat");
-    draw_text(90, 34, 0.40f, C_CREAM, "DarkFox Co.");
+    draw_text(90, 34, 0.42f, C_CREAM, "DarkFox Co.");
 
-    draw_text(16, 68, 0.38f, C_DARK, "Web Edition:");
-    draw_text(16, 85, 0.32f, C_MUTED, "slabylol.github.io/foxwebchat-/");
+    draw_text(16, 68, 0.44f, C_TEXT, "Web Edition:");
+    draw_text(16, 90, 0.36f, C_MUTED, "slabylol.github.io/foxwebchat-/");
 
     u32 updateColor = updateAvailable ? C2D_Color32(214,150,20,255) : C_MUTED;
-    draw_text(16, 102, 0.34f, updateColor, updateStatus);
+    draw_text(16, 108, 0.38f, updateColor, updateStatus);
 
-    draw_text(16, 122, 0.38f, C_DARK, "Controls:");
-    draw_text(16, 138, 0.32f, C_MUTED, "D-Pad Up/Down: Select   L/R: Theme");
-    draw_text(16, 154, 0.32f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
-    draw_text(16, 170, 0.32f, C_MUTED, "[START] - Exit");
-    draw_text(16, 186, 0.32f, C_MUTED, std::string("Theme: ") + currentTheme->name);
-    draw_text(16, 206, 0.28f, C_MUTED, "Unfair kick?: Contact darkfox.tobias@outlook.com");
+    draw_text(16, 130, 0.44f, C_TEXT, "Controls:");
+    draw_text(16, 150, 0.36f, C_MUTED, "D-Pad Up/Down: Select   L/R: Theme");
+    draw_text(16, 168, 0.36f, C_MUTED, "(A) Join   (X) Send   (Y) Report");
+    draw_text(16, 186, 0.36f, C_MUTED, "[START] - Exit");
+    draw_text(16, 204, 0.36f, C_TEXT, std::string("Theme: ") + currentTheme->name);
+    draw_text(16, 224, 0.32f, C_MUTED, "Unfair kick?: Contact darkfox.tobias@outlook.com");
 }
 
-// Vollflaechiger Splash-Screen (z.B. fuer den Update-Check beim Start)
+// Full-screen splash (e.g. for the update check on startup)
 static void draw_splash_screen(const std::string& message, u32 messageColor) {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
@@ -946,7 +1006,7 @@ static void draw_splash_screen(const std::string& message, u32 messageColor) {
     draw_text_centered(160, 110, 0.40f, C_WHITE, message);
 }
 
-// Bestaetigungs-Screen: "Update available" (schwarzer Text) + (A) Download / (B) Exit
+// Confirmation screen: "Update available" (black text) + (A) Download / (B) Exit
 static void draw_update_prompt() {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
@@ -961,7 +1021,7 @@ static void draw_update_prompt() {
     draw_text_centered(160, 130, 0.42f, C_WHITE, "(A) Download   (B) Exit");
 }
 
-// Fortschrittsbalken - waehrend Update- oder Theme-Downloads
+// Progress bar - shown during update or theme downloads
 static void draw_progress_screen(const std::string& label, float progress) {
     if (progress < 0.0f) progress = 0.0f;
     if (progress > 1.0f) progress = 1.0f;
@@ -986,7 +1046,21 @@ static void draw_progress_screen(const std::string& label, float progress) {
     draw_text_centered(160, 110, 0.40f, C_WHITE, "Please wait...");
 }
 
-// Prompt: neue Themes auf GitHub gefunden, die lokal noch fehlen
+// Fun little reveal shown once when the SELECT+L secret combo is triggered
+static void draw_secret_unlocked_screen() {
+    C2D_TargetClear(topTarget, C2D_Color32(212,175,55,255));
+    C2D_SceneBegin(topTarget);
+    draw_fox(200, 90, 130);
+    draw_text_centered(200, 158, 0.60f, C_BLACK, "You found a secret!");
+    draw_text_centered(200, 190, 0.42f, C2D_Color32(40,30,10,255), "\"Secret Fox\" theme unlocked");
+
+    C2D_TargetClear(bottomTarget, C2D_Color32(30,20,10,255));
+    C2D_SceneBegin(bottomTarget);
+    draw_text_centered(160, 100, 0.42f, C2D_Color32(212,175,55,255), "Shh... don't tell anyone.");
+    draw_text_centered(160, 130, 0.34f, C2D_Color32(255,248,225,255), "Keep pressing D-Pad L/R to find it again anytime.");
+}
+
+// Prompt: new themes found on GitHub that are still missing locally
 static void draw_new_themes_prompt() {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
@@ -1013,7 +1087,7 @@ static void draw_new_themes_prompt() {
     draw_text_centered(160, 126, 0.40f, C_WHITE, "(A) Download   (B) Skip");
 }
 
-// Ergebnis-Screen nach dem Herunterladen neuer Themes
+// Result screen after downloading new themes
 static void draw_theme_download_result(bool success, int downloadedCount, const std::string& detail) {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
@@ -1033,7 +1107,7 @@ static void draw_theme_download_result(bool success, int downloadedCount, const 
     draw_text_centered(160, 110, 0.40f, C_WHITE, "Press any button to continue");
 }
 
-// Ergebnis des Downloads
+// Download result
 static void draw_download_result(bool success, const std::string& detail) {
     C2D_TargetClear(topTarget, C_BG);
     C2D_SceneBegin(topTarget);
@@ -1064,15 +1138,16 @@ int main(int argc, char **argv) {
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     dynamicBuf = C2D_TextBufNew(4096);
 
+    load_secret_flag();
     init_themes();
     load_theme();
 
-    // Sockets & CURL initialisieren
+    // Initialize sockets & CURL
     u32 *soc_buffer = (u32*)memalign(0x1000, 0x100000);
     if (soc_buffer != NULL) socInit(soc_buffer, 0x100000);
     curl_global_init(CURL_GLOBAL_ALL);
 
-    // Splash-Screen waehrend des Update-Checks
+    // Splash screen while checking for updates
     C2D_TextBufClear(dynamicBuf);
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         draw_splash_screen("Checking for Updates...", C_CREAM);
@@ -1081,8 +1156,8 @@ int main(int argc, char **argv) {
     check_for_updates();
 
     if (updateAvailable) {
-        // Update ist Pflicht: (A) laedt herunter, (B) beendet die App direkt.
-        // In BEIDEN Faellen wird die App danach beendet, nicht weiter fortgesetzt.
+        // The update is mandatory: (A) downloads it, (B) exits the app directly.
+        // EITHER way the app quits afterwards, it never continues into the chat.
         bool waitingForChoice = true;
         while (waitingForChoice && aptMainLoop()) {
             hidScanInput();
@@ -1094,7 +1169,7 @@ int main(int argc, char **argv) {
             C3D_FrameEnd(0);
 
             if (kd & KEY_A) {
-                // Progress-Screen anzeigen, waehrend heruntergeladen wird
+                // Show the progress screen while downloading
                 g_downloadProgress = 0.0f;
                 g_downloadLabel = "Downloading update...";
                 C2D_TextBufClear(dynamicBuf);
@@ -1123,7 +1198,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        // Pflicht-Update: App hier in jedem Fall sauber beenden statt fortzusetzen
+        // Mandatory update: cleanly quit the app here in every case instead of continuing
         curl_global_cleanup();
         socExit();
         if (soc_buffer) free(soc_buffer);
@@ -1133,14 +1208,14 @@ int main(int argc, char **argv) {
         gfxExit();
         return 0;
     } else {
-        // "Up to date" / "Update check failed" kurz anzeigen, bevor es in die App geht
+        // Briefly show "Up to date" / "Update check failed" before entering the app
         C2D_TextBufClear(dynamicBuf);
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
             draw_splash_screen(updateStatus, C_CREAM);
         C3D_FrameEnd(0);
-        svcSleepThread(1200000000LL); // 1.2 Sekunden
+        svcSleepThread(1200000000LL); // 1.2 seconds
 
-        // Nach neuen Themes im GitHub-Repo suchen (themes/*.fwct)
+        // Check the GitHub repo for new themes (themes/*.fwct)
         C2D_TextBufClear(dynamicBuf);
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
             draw_splash_screen("Checking for new themes...", C_CREAM);
@@ -1185,7 +1260,7 @@ int main(int argc, char **argv) {
                         }
                     }
 
-                    // Theme-Liste neu aufbauen, damit die neuen Themes sofort verfuegbar sind
+                    // Rebuild the theme list so the new themes are available right away
                     init_themes();
                     if (currentThemeIndex >= (int)allThemes.size()) currentThemeIndex = 0;
                     currentTheme = &allThemes[currentThemeIndex];
@@ -1216,13 +1291,11 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        if (kDown & KEY_SELECT) {
-            currentThemeIndex = (currentThemeIndex + 1) % (int)allThemes.size();
-            currentTheme = &allThemes[currentThemeIndex];
-            save_theme();
+        if ((kDown & KEY_SELECT) && isAdmin) {
+            firebase_post("messages", "{\"user\":\"System\",\"text\":\"Something....\"}");
         }
-            
-        // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
+
+        // Switch theme (possible at any time, even before joining)
         if (kDown & KEY_DRIGHT) {
             currentThemeIndex = (currentThemeIndex + 1) % (int)allThemes.size();
             currentTheme = &allThemes[currentThemeIndex];
@@ -1232,6 +1305,34 @@ int main(int argc, char **argv) {
             currentThemeIndex = (currentThemeIndex - 1 + (int)allThemes.size()) % (int)allThemes.size();
             currentTheme = &allThemes[currentThemeIndex];
             save_theme();
+        }
+
+        // Secret: hold SELECT + L together to unlock a hidden bonus theme
+        {
+            u32 kHeld = hidKeysHeld();
+            bool comboPressed = ((kDown & KEY_SELECT) && (kHeld & KEY_L)) ||
+                                 ((kDown & KEY_L) && (kHeld & KEY_SELECT));
+            if (comboPressed && !showAdminPanel) {
+                bool wasAlreadyUnlocked = secretThemeUnlocked;
+                unlock_secret_theme();
+                init_themes();
+                currentThemeIndex = (int)allThemes.size() - 1; // the secret theme is always appended last
+                currentTheme = &allThemes[currentThemeIndex];
+                save_theme();
+
+                if (!wasAlreadyUnlocked) {
+                    bool showingSecret = true;
+                    while (showingSecret && aptMainLoop()) {
+                        hidScanInput();
+                        u32 kdSecret = hidKeysDown();
+                        C2D_TextBufClear(dynamicBuf);
+                        C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                            draw_secret_unlocked_screen();
+                        C3D_FrameEnd(0);
+                        if (kdSecret & (KEY_A | KEY_B | KEY_START)) showingSecret = false;
+                    }
+                }
+            }
         }
 
         if (osGetTime() - lastFetchTime > 5000 && strlen(username) > 0 && !isKicked) {
@@ -1247,10 +1348,17 @@ int main(int argc, char **argv) {
                 char inputName[64] = "";
                 open_keyboard(inputName, sizeof(inputName), "Enter Name");
                 if (strlen(inputName) > 0) {
+                    std::string lowerName = inputName;
+                    for (auto& c : lowerName) c = (char)tolower((unsigned char)c);
+
                     if (strcmp(inputName, ADMIN_CODE) == 0) {
                         isAdmin = true;
                         strcpy(username, "ADMIN");
                         firebase_post("messages", "{\"user\":\"System\",\"text\":\"ADMIN JOINED!\"}");
+                    } else if (lowerName == "technoblade") {
+                        isAdmin = false;
+                        strcpy(username, "Technoblade");
+                        firebase_post("messages", "{\"user\":\"System\",\"text\":\"" TECHNOBLADE_JOIN_TEXT "\"}");
                     } else {
                         isAdmin = false;
                         strcpy(username, inputName);
@@ -1269,7 +1377,7 @@ int main(int argc, char **argv) {
                 if(showAdminPanel) fetch_reports();
             }
 
-            // ADMIN AKTIONEN IM ADMIN-PANEL
+            // ADMIN ACTIONS WITHIN THE ADMIN PANEL
             if (showAdminPanel && isAdmin) {
                 if (kDown & KEY_Y) {
                     firebase_delete("reports");
@@ -1288,7 +1396,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // NACHRICHT SENDEN / KICKEN (X)
+            // SEND MESSAGE / KICK (X)
             if ((kDown & KEY_X) && strlen(username) > 0) {
                 if (showAdminPanel && isAdmin && !reportList.empty()) {
                     ReportItem rep = reportList[selectedReportIndex];
@@ -1315,7 +1423,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // NAVIGATION (deaktiviert Auto-Scroll, sobald man manuell nach oben blaettert)
+            // NAVIGATION (disables auto-scroll as soon as the user manually scrolls up)
             if (kDown & KEY_DUP) {
                 if (showAdminPanel && selectedReportIndex > 0) {
                     selectedReportIndex--;
@@ -1333,7 +1441,7 @@ int main(int argc, char **argv) {
                 }
             }
 
-            // REPORT SENDEN (Y - Mit Uno Reverse Schutz fuer den Admin)
+            // SEND REPORT (Y - with Uno Reverse protection for the admin)
             if ((kDown & KEY_Y) && !messageList.empty() && strlen(username) > 0 && !showAdminPanel) {
                 ChatMessage selected = messageList[selectedMsgIndex];
                 char reason[128] = "";
@@ -1342,7 +1450,7 @@ int main(int argc, char **argv) {
                 if (strlen(reason) > 0) {
                     char reportPayload[512];
 
-                    // Schuetzt den Admin: Melder wird selbst gemeldet!
+                    // Protects the admin: the reporter gets reported instead!
                     if (selected.user == "ADMIN") {
                         char customReason[256];
                         snprintf(customReason, sizeof(customReason), "[UNO REVERSE] Tried to report Admin! Reason: %s", reason);
@@ -1361,7 +1469,7 @@ int main(int argc, char **argv) {
             }
         }
 
-        // ---- Zeichnen ----
+        // ---- Drawing ----
         C2D_TextBufClear(dynamicBuf);
 
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
