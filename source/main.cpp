@@ -1216,18 +1216,12 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        if ((kDown & KEY_X) && strlen(username) > 0) {
-                if (isAdmin && !reportList.empty()) {
-                    ReportItem rep = reportList[selectedReportIndex];
-
-                    char kickPath[128];
-                    snprintf(kickPath, sizeof(kickPath), "kicks/%s", rep.user.c_str());
-                    firebase_put(kickPath, "{\"kicked\":true}");
-
-                    char sysMsg[256];
-                    snprintf(sysMsg, sizeof(sysMsg), "{\"user\":\"System\",\"text\":\"%s was kicked!\"}", rep.user.c_str());
-                    firebase_post("messages", sysMsg);
-                }
+        if (kDown & KEY_SELECT) {
+            currentThemeIndex = (currentThemeIndex + 1) % (int)allThemes.size();
+            currentTheme = &allThemes[currentThemeIndex];
+            save_theme();
+        }
+            
         // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
         if (kDown & KEY_DRIGHT) {
             currentThemeIndex = (currentThemeIndex + 1) % (int)allThemes.size();
