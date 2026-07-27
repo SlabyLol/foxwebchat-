@@ -9,7 +9,13 @@ body:
       value: |
         # Theme Submission
         
-        Thank you for submitting a theme to FoxWebChat! Please fill out all fields completely.
+        Thank you for submitting a theme to FoxWebChat!
+        
+        Please follow these steps:
+        1. Create your own repository with a `themes/` folder
+        2. Upload your .fwct file to the `themes/` folder
+        3. Copy the raw link to your .fwct file
+        4. Fill out this form with the link
         
         Note: It may take some time for your submission to be reviewed and processed.
 
@@ -34,9 +40,18 @@ body:
   - type: textarea
     id: theme_file_link
     attributes:
-      label: Theme File (.fwct)
-      description: Upload your .fwct file to this PR and provide the link here
-      placeholder: "Link to your .fwct file in this PR (e.g., themes/my_theme.fwct)"
+      label: Theme File (.fwct) Link
+      description: Paste the raw link to your .fwct file from your repository
+      placeholder: "https://raw.githubusercontent.com/yourusername/your-repo/main/themes/your_theme.fwct"
+    validations:
+      required: true
+
+  - type: textarea
+    id: repository_link
+    attributes:
+      label: Your Repository Link
+      description: Link to your repository where you uploaded the theme
+      placeholder: "https://github.com/yourusername/your-repo"
     validations:
       required: true
 
