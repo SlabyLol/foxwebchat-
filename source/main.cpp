@@ -1220,7 +1220,7 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        if (kDown & KEY_SELECT) && (kDown & KEY_A) {
+        if ((kDown & KEY_SELECT) && (kDown & KEY_A)) {
             showSecret = !showSecret;
         }
 
