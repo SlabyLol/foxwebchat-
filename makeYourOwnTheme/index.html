@@ -371,6 +371,10 @@ function downloadTheme() {
   URL.revokeObjectURL(url);
 }
 
+  function submitFWTC(); {
+ window.location.href = "https://github.com/SlabyLol/foxwebchat-/issues/new?q=is%3Aissue+state%3Aopen";   
+  }
+  
 function randomTheme() {
   function randHex() {
     return '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
@@ -389,7 +393,7 @@ function randomTheme() {
 document.getElementById('downloadBtn').addEventListener('click', downloadTheme);
 document.getElementById('randomBtn').addEventListener('click', randomTheme);
 document.getElementById('themeName').addEventListener('input', updatePreview);
-
+document.getElementById('submitBtn').addEventListener('click', submitFWTC);
 updatePreview();
 </script>
 
