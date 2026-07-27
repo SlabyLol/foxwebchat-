@@ -825,11 +825,6 @@ static void draw_top_screen() {
         return;
     }
 
-    if (showSecret) {
-        draw_text(8, y, 0.55f, C_ADMIN, "You found the secret code send it to darkfox.tobias@outlook.com for a prize!"; y += 22;
-        draw_text(8, y, 0.44f, C_BLACK, "FWC83h"; y += 16;
-        return;
-    }
     
     if (strlen(username) == 0) {
         draw_text(20, 60, 0.58f, C_DARK, "Press (A) to enter name / join");
@@ -1221,10 +1216,18 @@ int main(int argc, char **argv) {
 
         if (kDown & KEY_START) break;
 
-        if ((kDown & KEY_SELECT && kDown & KEY_A) {
-            showSecret = !showSecret;
-        }
+        if ((kDown & KEY_X) && strlen(username) > 0) {
+                if (isAdmin && !reportList.empty()) {
+                    ReportItem rep = reportList[selectedReportIndex];
 
+                    char kickPath[128];
+                    snprintf(kickPath, sizeof(kickPath), "kicks/%s", rep.user.c_str());
+                    firebase_put(kickPath, "{\"kicked\":true}");
+
+                    char sysMsg[256];
+                    snprintf(sysMsg, sizeof(sysMsg), "{\"user\":\"System\",\"text\":\"%s was kicked!\"}", rep.user.c_str());
+                    firebase_post("messages", sysMsg);
+                }
         // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
         if (kDown & KEY_DRIGHT) {
             currentThemeIndex = (currentThemeIndex + 1) % (int)allThemes.size();
