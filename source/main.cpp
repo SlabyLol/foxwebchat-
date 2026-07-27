@@ -1216,7 +1216,7 @@ int main(int argc, char **argv) {
         if (kDown & KEY_START) break;
 
         if ((kDown & KEY_SELECT) && isAdmin) {
-            firebase_post("messages", "{\"user\":\"System\",\"text\":\"Something....\"}");
+            firebase_post("messages", "{\"user\":\"ERROR_CODE\",\"text\":\"socket_post failed ERR:EF8\"}");
         }
 
         // Theme wechseln (jederzeit moeglich, auch vor dem Beitreten)
