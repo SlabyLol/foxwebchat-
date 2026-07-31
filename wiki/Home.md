@@ -16,11 +16,11 @@
 
 | Page | Description |
 |------|-------------|
-| [Installation](Installation) | How to install the 3DS app |
-| [Controls](Controls) | Button mapping & usage |
-| [Themes](Themes) | Built-in themes + custom `.fwct` themes |
-| [Building](Building) | Compile from source |
-| [FAQ](FAQ) | Frequently asked questions |
+| [Installation](Installation.md) | How to install the 3DS app |
+| [Controls](Controls.md) | Button mapping & usage |
+| [Themes](Themes.md) | Built-in themes + custom `.fwct` themes |
+| [Building](Building.md) | Compile from source |
+| [FAQ](FAQ.md) | Frequently asked questions |
 
 ## What is FoxWebChat?
 
