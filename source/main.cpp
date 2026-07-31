@@ -957,6 +957,38 @@ static std::string truncate_text(const std::string& s, size_t maxLen) {
     return s.substr(0, maxLen - 3) + "...";
 }
 
+// Same hash-based color algorithm as the web version, so a given username
+// gets the same avatar color on both platforms.
+static u32 avatar_color_for_name(const std::string& name) {
+    int hash = 0;
+    for (unsigned char c : name) {
+        hash = (int)c + ((hash << 5) - hash);
+    }
+    int hue = ((hash % 360) + 360) % 360;
+
+    float h = hue / 360.0f;
+    float s = 0.62f;
+    float l = 0.48f;
+
+    auto hue2rgb = [](float p, float q, float t) -> float {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1.0f/6) return p + (q - p) * 6 * t;
+        if (t < 1.0f/2) return q;
+        if (t < 2.0f/3) return p + (q - p) * (2.0f/3 - t) * 6;
+        return p;
+    };
+
+    float r, g, b;
+    float q = l < 0.5f ? l * (1 + s) : l + s - l * s;
+    float p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1.0f/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1.0f/3);
+
+    return C2D_Color32((u8)(r*255), (u8)(g*255), (u8)(b*255), 255);
+}
+
 static void draw_text(float x, float y, float scale, u32 color, const std::string& str) {
     C2D_Text text;
     C2D_TextParse(&text, dynamicBuf, str.c_str());
