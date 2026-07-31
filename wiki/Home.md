@@ -5,7 +5,6 @@
 > An Public chat for everyone!
 
 - **Author**: DarkFox Co.
-- **Version**: 1.7.0
 - **License**: MIT
 - **Platform**: Nintendo 3DS (`.3dsx` / `.cia`) + Web
 - **Backend**: Firebase Realtime Database
