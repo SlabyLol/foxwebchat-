@@ -74,7 +74,8 @@ Current community themes in the repo:
 ### Submitting a Theme
 
 1. Create your theme with the Theme Creator or by hand.
-2. Open a GitHub Issue using the **Theme Submission** template, **or**
-3. Open a Pull Request that adds your `.fwct` file under `themes/`.
+2. Open a GitHub Issue using the **Theme Submission** template
+3. Make a repository and upload your .fwct file and copy the link
+4. Paste the link into the .fwct section
 
 Copyright DarkFox Co.
