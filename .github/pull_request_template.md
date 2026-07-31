@@ -80,3 +80,5 @@ body:
       placeholder: "Special features, notes, etc."
     validations:
       required: false
+
+Copyright DarkFox Co.

@@ -76,3 +76,5 @@ Current community themes in the repo:
 1. Create your theme with the Theme Creator or by hand.
 2. Open a GitHub Issue using the **Theme Submission** template, **or**
 3. Open a Pull Request that adds your `.fwct` file under `themes/`.
+
+Copyright DarkFox Co.

@@ -45,3 +45,5 @@ foxwebchat-/
 - Networking via **libcurl** + **mbedtls** (SSL).
 - Backend: Firebase Realtime Database (`foxwebchat-bd592`).
 - Theme system is completely data-driven; custom themes are loaded from SD at runtime.
+
+Copyright DarkFox Co.

@@ -50,3 +50,5 @@ Full documentation lives in the [`wiki/`](wiki/) folder:
 ## License
 
 MIT © DarkFox Co.
+
+Copyright DarkFox Co.

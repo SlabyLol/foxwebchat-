@@ -9,7 +9,7 @@
 
 ## Download
 
-1. Go to the [Releases](https://github.com/SlabyLol/foxwebchat-/releases/tag/nightly)) page.
+1. Go to the [Releases](https://github.com/SlabyLol/foxwebchat-/releases/tag/nightly) page.
 2. Download the latest **FoxWebChat.cia**.
 
 The app also offers an in-app update download when a newer version is detected.
@@ -49,3 +49,5 @@ No installation needed. Open:
 **https://slabylol.github.io/foxwebchat-/**
 
 Enter a name and chat with the same room as the 3DS clients.
+
+Copyright DarkFox Co.

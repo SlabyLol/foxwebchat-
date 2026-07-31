@@ -31,3 +31,5 @@ A: Yes! Use the Theme Creator and open an Issue or Pull Request. See the [Themes
 
 **Q: Can I contribute code?**  
 A: Pull Requests are welcome. Please keep the single-file style of `main.cpp` or discuss larger refactors first.
+
+Copyright DarkFox Co.

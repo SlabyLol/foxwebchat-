@@ -40,3 +40,5 @@ FoxWebChat turns your Nintendo 3DS into a live public chat client. Messages are 
 ## Screenshots
 
 See the [README](https://github.com/SlabyLol/foxwebchat-) for top/bottom screen captures.
+
+Copyright DarkFox Co.

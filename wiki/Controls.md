@@ -23,3 +23,5 @@
 - Type a message → **Send** (or press Enter)
 - Click **Report** on any message
 - Theme dots in the top-right switch color schemes
+
+Copyright DarkFox Co.
