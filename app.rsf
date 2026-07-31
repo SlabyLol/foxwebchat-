@@ -3,7 +3,7 @@ BasicInfo:
   CompanyCode             : "00"
   ProductCode             : FOX-WEBCHAT
   ContentType             : Application
-  Logo                    : Homebrew
+  Logo                    : Nintendo
 
 TitleInfo:
   UniqueId                : 0xF0011
