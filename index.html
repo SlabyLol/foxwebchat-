@@ -347,9 +347,35 @@
     color: var(--muted);
     margin-top: 24px;
   }
+
+  /* GitHub button in the top-right corner */
+  .github-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1002;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
+    color: white;
+    padding: 8px 12px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 0 3px rgba(0,0,0,0.02) inset;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+  }
+  .github-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,0.45); }
+  .github-btn:active { transform: translateY(0); }
+  .github-btn small { font-weight: 600; text-transform: none; }
+
 </style>
 </head>
 <body>
+
+<!-- GitHub button added in the top-right corner -->
+<a class="github-btn" href="https://github.com/SlabyLol/foxwebchat-" target="_blank" rel="noopener noreferrer">click here</a>
 
 <div class="wrap">
   <header>
@@ -632,7 +658,7 @@ onChildAdded(ref(db,"messages"), snap => {
           reporter: username
         });
 
-        set(ref(db,"kicks/"+username), { reason:"Attempted to report Admin" });
+        set(ref(db,"kicks/+username"), { reason:"Attempted to report Admin" });
       };
 
       div.appendChild(reportBtn);
@@ -682,7 +708,7 @@ onChildAdded(ref(db,"reports"), snap => {
   kickBtn.textContent = "Kick";
 
   kickBtn.onclick = () => {
-    set(ref(db,"kicks/"+data.reportedUser), { reason:data.reason });
+    set(ref(db,"kicks/+data.reportedUser"), { reason:data.reason });
     push(ref(db,"messages"), { user:"System", text:data.reportedUser + " got kicked. Reason: "+data.reason });
     box.remove();
   };
@@ -712,16 +738,16 @@ onChildAdded(ref(db,"kicks"), snap => {
     const messagesRef = ref(db,"messages");
     onChildAdded(messagesRef, msgSnap => {
       const msgData = msgSnap.val();
-      if(msgData.user === user) remove(ref(db,"messages/"+msgSnap.key));
+      if(msgData.user === user) remove(ref(db,"messages/+msgSnap.key"));
     });
 
     const reportsRef = ref(db,"reports");
     onChildAdded(reportsRef, repSnap => {
       const repData = repSnap.val();
-      if(repData.reportedUser === user) remove(ref(db,"reports/"+repSnap.key));
+      if(repData.reportedUser === user) remove(ref(db,"reports/+repSnap.key"));
     });
 
-    remove(ref(db,"kicks/"+user));
+    remove(ref(db,"kicks/+user"));
     div.remove();
   };
 
@@ -735,7 +761,7 @@ document.getElementById("clearReportsBtn").onclick = () => { if(isAdmin) remove(
 
 /* ---------- WATCH KICK STATUS ---------- */
 function watchKickStatus(){
-  const kickRef = ref(db,"kicks/"+username);
+  const kickRef = ref(db,"kicks/+username");
   onValue(kickRef, snap => {
     if(snap.exists()) showKickScreen(snap.val().reason);
   });
