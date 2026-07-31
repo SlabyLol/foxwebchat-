@@ -9,7 +9,7 @@
 
 ## Download
 
-1. Go to the [Releases](https://github.com/SlabyLol/foxwebchat-/releases/NIGHTLY) page.
+1. Go to the [Releases](https://github.com/SlabyLol/foxwebchat-/releases/tag/nightly)) page.
 2. Download the latest **FoxWebChat.cia**.
 
 The app also offers an in-app update download when a newer version is detected.
