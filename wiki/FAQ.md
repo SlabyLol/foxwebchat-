@@ -24,17 +24,6 @@ A: `sdmc:/3ds/FoxWebChat/FoxWebChat.cia`
 **Q: My custom theme does not appear.**  
 A: Make sure the file ends with `.fwct` and is placed in `sdmc:/3ds/FoxWebChat/themes/`. Restart the app.
 
-**Q: How do I unlock the Secret Fox theme?**  
-A: On 3DS hold **SELECT + L**. On the web hold **Shift + L**.
-
-## Moderation
-
-**Q: I was kicked unfairly.**  
-A: Contact **darkfox.tobias@outlook.com**.
-
-**Q: Can I report the Admin?**  
-A: You can try, but you will receive an Uno Reverse and may be kicked yourself.
-
 ## Development
 
 **Q: Can I contribute themes?**  

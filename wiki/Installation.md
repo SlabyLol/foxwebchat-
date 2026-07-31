@@ -39,8 +39,7 @@ On first start the app will:
 sdmc:/3ds/FoxWebChat/
 ├── themes/          ← put custom .fwct files here
 ├── theme.cfg        ← last selected theme index
-├── FoxWebChat.cia   ← downloaded updates land here
-└── technoblade.wav  ← special sound (auto-downloaded if missing)
+└── FoxWebChat.cia   ← downloaded updates land here
 ```
 
 ## Web Edition

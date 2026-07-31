@@ -19,7 +19,6 @@
 | [Installation](Installation) | How to install the 3DS app |
 | [Controls](Controls) | Button mapping & usage |
 | [Themes](Themes) | Built-in themes + custom `.fwct` themes |
-| [Admin](Admin) | Admin features & reporting |
 | [Building](Building) | Compile from source |
 | [FAQ](FAQ) | Frequently asked questions |
 
@@ -34,17 +33,10 @@ FoxWebChat turns your Nintendo 3DS into a live public chat client. Messages are 
 - Custom theme support (`.fwct` files)
 - Theme Creator website
 - Auto-download of new community themes from GitHub
-- Report system with admin moderation
-- Kick / ban support
+- Report system
 - Mandatory update checker (downloads `.cia`)
-- Secret "Secret Fox" theme (easter egg)
-- Technoblade special join message + sound
 - Dual-screen UI with custom fox branding
 
 ## Screenshots
 
 See the [README](https://github.com/SlabyLol/foxwebchat-) for top/bottom screen captures.
-
-## Contact
-
-Unfair kick? Contact: **darkfox.tobias@outlook.com**

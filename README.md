@@ -15,9 +15,8 @@ Nintendo 3DS homebrew chat + matching Web Edition. Real-time public chat powered
 - Multiple built-in color themes + custom `.fwct` themes
 - Online [Theme Creator](https://slabylol.github.io/foxwebchat-/makeYourOwnTheme/)
 - Auto-download of community themes from GitHub
-- Report / Kick moderation system
+- Report system
 - Mandatory update checker
-- Secret “Secret Fox” theme (SELECT+L)
 
 ## Quick Start
 
@@ -45,7 +44,6 @@ Full documentation lives in the [`wiki/`](wiki/) folder:
 | [Installation](wiki/Installation.md) | Install on 3DS |
 | [Controls](wiki/Controls.md) | Button mapping |
 | [Themes](wiki/Themes.md) | Custom themes & creator |
-| [Admin](wiki/Admin.md) | Moderation features |
 | [Building](wiki/Building.md) | Compile from source |
 | [FAQ](wiki/FAQ.md) | Frequently asked questions |
 

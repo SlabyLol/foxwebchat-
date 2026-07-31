@@ -44,5 +44,4 @@ foxwebchat-/
 - Uses **citro2d / citro3d** for dual-screen rendering.
 - Networking via **libcurl** + **mbedtls** (SSL).
 - Backend: Firebase Realtime Database (`foxwebchat-bd592`).
-- Audio (Technoblade sound) via **ndsp**.
 - Theme system is completely data-driven; custom themes are loaded from SD at runtime.

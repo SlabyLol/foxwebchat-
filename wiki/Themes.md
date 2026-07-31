@@ -14,7 +14,6 @@ FoxWebChat supports multiple color schemes. Switch them anytime with **D-Pad Lef
 | Pastell | Soft pastel pink |
 | Sonnenschein | Sunshine yellow |
 | Tuerkis | Teal |
-| Secret Fox | Hidden gold theme (unlock with SELECT+L) |
 
 ## Custom Themes (`.fwct`)
 
