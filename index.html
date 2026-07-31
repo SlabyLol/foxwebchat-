@@ -85,6 +85,16 @@
     z-index: 1;
   }
 
+  /* ---- Theme palettes (mirroring the 3DS app's built-in themes) ---- */
+  body[data-theme="blue"]     { --orange:#5850dc; --orange-dark:#3a32a8; --orange-glow:rgba(88,80,220,0.35); }
+  body[data-theme="red"]      { --orange:#d23a28; --orange-dark:#a5261a; --orange-glow:rgba(210,58,40,0.35); }
+  body[data-theme="dark"]     { --orange:#7a7a88; --orange-dark:#4a4a54; --orange-glow:rgba(122,122,136,0.35); }
+  body[data-theme="forest"]   { --orange:#3c8c46; --orange-dark:#266932; --orange-glow:rgba(60,140,70,0.35); }
+  body[data-theme="pastel"]   { --orange:#f096be; --orange-dark:#d76e9b; --orange-glow:rgba(240,150,190,0.35); }
+  body[data-theme="sunshine"] { --orange:#fabe28; --orange-dark:#dc9b0a; --orange-glow:rgba(250,190,40,0.35); }
+  body[data-theme="teal"]     { --orange:#23aaa5; --orange-dark:#147d78; --orange-glow:rgba(35,170,165,0.35); }
+  body[data-theme="secret"]   { --orange:#d4af37; --orange-dark:#a3841f; --orange-glow:rgba(212,175,55,0.45); }
+
   header {
     display: flex;
     align-items: center;
@@ -99,6 +109,7 @@
     flex-shrink: 0;
     border-radius: 16px;
     box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 8px 24px var(--orange-glow);
+    overflow: hidden;
   }
 
   header .logo { width: 56px; height: 56px; display: block; }
@@ -117,6 +128,33 @@
     margin: 2px 0 0;
     font-size: 13px;
     color: var(--muted);
+  }
+
+  .theme-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    max-width: 140px;
+    justify-content: flex-end;
+  }
+
+  .theme-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+
+  .theme-dot:hover { transform: scale(1.15); box-shadow: none; }
+  .theme-dot.active { border-color: #ffffff; }
+
+  .theme-dot.secret {
+    background: linear-gradient(135deg, #d4af37, #fff3c4, #d4af37);
+    animation: popIn 0.4s ease;
   }
 
   .card {
@@ -240,6 +278,12 @@
   .message.admin-text .user { color: var(--admin-red); }
   .message.admin-text { border-color: var(--admin-red); box-shadow: 0 0 0 1px var(--admin-red) inset; }
 
+  .message.technoblade-msg {
+    color: var(--admin-red);
+    font-weight: 700;
+    font-size: 13px;
+  }
+
   .message button {
     background: transparent;
     border: 1px solid var(--border);
@@ -309,21 +353,24 @@
 
 <div class="wrap">
   <header>
-    <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-      <rect x="0" y="0" width="100" height="100" rx="22" fill="#f77f33"/>
-      <polygon points="27,15 15,45 42,35" fill="#ffffff"/>
-      <polygon points="73,15 85,45 58,35" fill="#ffffff"/>
-      <polygon points="30,20 22,40 39,34" fill="#e15a23"/>
-      <polygon points="70,20 78,40 61,34" fill="#e15a23"/>
-      <ellipse cx="50" cy="55" rx="29" ry="25" fill="#ffffff"/>
-      <polygon points="40,52 60,52 50,72" fill="#f77f33"/>
-      <circle cx="40" cy="49" r="4.5" fill="#3d211a"/>
-      <circle cx="60" cy="49" r="4.5" fill="#3d211a"/>
-    </svg>
-    <div>
+    <div class="logo-wrap">
+      <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="100" height="100" rx="22" fill="#f77f33"/>
+        <polygon points="27,15 15,45 42,35" fill="#ffffff"/>
+        <polygon points="73,15 85,45 58,35" fill="#ffffff"/>
+        <polygon points="30,20 22,40 39,34" fill="#e15a23"/>
+        <polygon points="70,20 78,40 61,34" fill="#e15a23"/>
+        <ellipse cx="50" cy="55" rx="29" ry="25" fill="#ffffff"/>
+        <polygon points="40,52 60,52 50,72" fill="#f77f33"/>
+        <circle cx="40" cy="49" r="4.5" fill="#3d211a"/>
+        <circle cx="60" cy="49" r="4.5" fill="#3d211a"/>
+      </svg>
+    </div>
+    <div style="flex:1;">
       <h1>FoxWebChat</h1>
       <p>Web Edition &middot; DarkFox Co.</p>
     </div>
+    <div id="themeRow" class="theme-row"></div>
   </header>
 
   <div class="card">
@@ -393,8 +440,88 @@ function avatarColor(name){
   return `hsl(${hue}, 62%, 48%)`;
 }
 
+/* ---------- THEMES (mirroring the 3DS app's built-in themes) ---------- */
+const THEMES = [
+  { id: "orange",   swatch: "#f77f33" },
+  { id: "blue",     swatch: "#5850dc" },
+  { id: "red",      swatch: "#d23a28" },
+  { id: "dark",     swatch: "#7a7a88" },
+  { id: "forest",   swatch: "#3c8c46" },
+  { id: "pastel",   swatch: "#f096be" },
+  { id: "sunshine", swatch: "#fabe28" },
+  { id: "teal",     swatch: "#23aaa5" },
+];
+const SECRET_THEME_ID = "secret";
+const SECRET_FLAG = "FWCT-SECRET-9f2c";
+
+function applyTheme(id){
+  document.body.setAttribute("data-theme", id === "orange" ? "" : id);
+  localStorage.setItem("fwc_theme", id);
+  renderThemeRow();
+}
+
+function renderThemeRow(){
+  const row = document.getElementById("themeRow");
+  row.innerHTML = "";
+  const active = localStorage.getItem("fwc_theme") || "orange";
+
+  THEMES.forEach(t => {
+    const dot = document.createElement("button");
+    dot.className = "theme-dot" + (t.id === active ? " active" : "");
+    dot.style.background = t.swatch;
+    dot.title = t.id;
+    dot.onclick = () => applyTheme(t.id);
+    row.appendChild(dot);
+  });
+
+  if(localStorage.getItem("fwc_secret") === SECRET_FLAG){
+    const secretDot = document.createElement("button");
+    secretDot.className = "theme-dot secret" + (active === SECRET_THEME_ID ? " active" : "");
+    secretDot.title = "??? Secret Fox ???";
+    secretDot.onclick = () => applyTheme(SECRET_THEME_ID);
+    row.appendChild(secretDot);
+  }
+}
+
+function unlockSecretTheme(){
+  const alreadyUnlocked = localStorage.getItem("fwc_secret") === SECRET_FLAG;
+  localStorage.setItem("fwc_secret", SECRET_FLAG);
+  applyTheme(SECRET_THEME_ID);
+  if(!alreadyUnlocked) showSecretToast();
+}
+
+function showSecretToast(){
+  const toast = document.createElement("div");
+  toast.style.cssText = `
+    position:fixed; top:20px; left:50%; transform:translateX(-50%);
+    background:linear-gradient(135deg,#d4af37,#a3841f); color:#1e140a;
+    padding:14px 22px; border-radius:12px; font-weight:600; font-size:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.4); z-index:999; animation:popIn 0.3s ease;
+  `;
+  toast.textContent = "\u2728 You found a secret! \"Secret Fox\" theme unlocked \u2728";
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Secret combo: hold Shift and press L (mirrors SELECT+L on the 3DS app)
+document.addEventListener("keydown", (e) => {
+  if(e.shiftKey && (e.key === "L" || e.key === "l")){
+    unlockSecretTheme();
+  }
+});
+
+applyTheme(localStorage.getItem("fwc_theme") || "orange");
+
 let isAdmin = false;
 const ADMIN_CODE = "AdminJs93€=no";
+const TECHNOBLADE_JOIN_TEXT = "The Legend is here.... TECHNOBLADE JOINED";
+
+function playTechnobladeSound(){
+  try {
+    const audio = new Audio("tnd.wav");
+    audio.play().catch(() => {});
+  } catch(e) {}
+}
 
 /* ---------- JOIN FUNCTION ---------- */
 function joinChat() {
@@ -408,6 +535,10 @@ function joinChat() {
     username = "ADMIN";
     document.getElementById("adminPanel").style.display = "block";
     push(ref(db,"messages"), {user:"System", text:"ADMIN JOINED - WARNING!"});
+  } else if(username.toLowerCase() === "technoblade"){
+    username = "Technoblade";
+    push(ref(db,"messages"), {user:"System", text:TECHNOBLADE_JOIN_TEXT});
+    playTechnobladeSound();
   } else {
     push(ref(db,"messages"), {user:"System", text:username + " joined"});
   }
@@ -451,6 +582,7 @@ onChildAdded(ref(db,"messages"), snap => {
   div.className = "message";
   if(data.user === "System") div.classList.add("system");
   if(data.user === "ADMIN") div.classList.add("admin-text");
+  if(data.user === "System" && data.text === TECHNOBLADE_JOIN_TEXT) div.classList.add("technoblade-msg");
 
   if(data.user !== "System"){
     const avatar = document.createElement("div");
