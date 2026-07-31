@@ -13,10 +13,13 @@
 #include <vector>
 #include <string>
 #include <curl/curl.h>
+#include <3ds/ndsp/ndsp.h>
 
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
 #define ADMIN_CODE "AdminJs93€=no"
 #define TECHNOBLADE_JOIN_TEXT "The Legend is here.... TECHNOBLADE JOINED"
+#define TECHNOBLADE_SOUND_PATH "sdmc:/3ds/FoxWebChat/technoblade.wav"
+#define TECHNOBLADE_SOUND_URL "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/main/tnd.wav"
 #define UPDATE_CIA_URL "https://github.com/SlabyLol/foxwebchat-/releases/download/nightly/FoxWebChat.cia"
 #define UPDATE_CIA_DIR "sdmc:/3ds/FoxWebChat"
 #define UPDATE_CIA_PATH "sdmc:/3ds/FoxWebChat/FoxWebChat.cia"
@@ -404,6 +407,149 @@ static void unlock_secret_theme() {
         fprintf(fp, "%s", SECRET_FLAG_MAGIC);
         fclose(fp);
     }
+}
+
+// ---------------------------------------------------------------------
+// Minimal WAV playback via ndsp. Only reads/plays a file that already
+// exists on the SD card - the app never downloads or bundles audio itself.
+// ---------------------------------------------------------------------
+struct WavAudio {
+    u8* data = nullptr;
+    u32 size = 0;
+    u32 sampleRate = 0;
+    u16 channels = 0;
+    bool loaded = false;
+};
+
+static WavAudio g_technobladeAudio;
+static ndspWaveBuf g_technobladeWaveBuf;
+static bool g_ndspReady = false;
+
+// Parses a standard PCM WAV file (16-bit, mono or stereo).
+static bool load_wav_file(const char* path, WavAudio& out) {
+    FILE* fp = fopen(path, "rb");
+    if (!fp) return false;
+
+    char riff[4];
+    if (fread(riff, 1, 4, fp) != 4 || memcmp(riff, "RIFF", 4) != 0) { fclose(fp); return false; }
+    fseek(fp, 4, SEEK_CUR); // overall chunk size, not needed
+
+    char wave[4];
+    if (fread(wave, 1, 4, fp) != 4 || memcmp(wave, "WAVE", 4) != 0) { fclose(fp); return false; }
+
+    u16 channels = 1, bitsPerSample = 16;
+    u32 sampleRate = 0, dataSize = 0;
+    long dataOffset = -1;
+
+    while (!feof(fp)) {
+        char chunkId[4];
+        u32 chunkSize;
+        if (fread(chunkId, 1, 4, fp) != 4) break;
+        if (fread(&chunkSize, 4, 1, fp) != 1) break;
+
+        if (memcmp(chunkId, "fmt ", 4) == 0) {
+            u16 audioFormat = 1;
+            fread(&audioFormat, 2, 1, fp);
+            fread(&channels, 2, 1, fp);
+            fread(&sampleRate, 4, 1, fp);
+            fseek(fp, 6, SEEK_CUR); // byteRate(4) + blockAlign(2)
+            fread(&bitsPerSample, 2, 1, fp);
+            long remaining = (long)chunkSize - 16;
+            if (remaining > 0) fseek(fp, remaining, SEEK_CUR);
+        } else if (memcmp(chunkId, "data", 4) == 0) {
+            dataSize = chunkSize;
+            dataOffset = ftell(fp);
+            fseek(fp, chunkSize, SEEK_CUR);
+        } else {
+            fseek(fp, chunkSize, SEEK_CUR);
+        }
+    }
+
+    if (dataOffset < 0 || dataSize == 0 || bitsPerSample != 16) { fclose(fp); return false; }
+
+    u8* buf = (u8*)linearAlloc(dataSize);
+    if (!buf) { fclose(fp); return false; }
+
+    fseek(fp, dataOffset, SEEK_SET);
+    fread(buf, 1, dataSize, fp);
+    fclose(fp);
+
+    out.data = buf;
+    out.size = dataSize;
+    out.sampleRate = sampleRate;
+    out.channels = channels;
+    out.loaded = true;
+    return true;
+}
+
+// Downloads TECHNOBLADE_SOUND_URL (the user's own file in their repo) to
+// TECHNOBLADE_SOUND_PATH if it isn't already on the SD card.
+static bool ensure_technoblade_sound() {
+    FILE* existing = fopen(TECHNOBLADE_SOUND_PATH, "rb");
+    if (existing) { fclose(existing); return true; }
+
+    ensure_dir("sdmc:/3ds");
+    ensure_dir(UPDATE_CIA_DIR);
+
+    FILE* fp = fopen(TECHNOBLADE_SOUND_PATH, "wb");
+    if (!fp) return false;
+
+    CURL* curl = curl_easy_init();
+    bool ok = false;
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, TECHNOBLADE_SOUND_URL);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "FoxWebChat-3DS");
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 8L);
+
+        CURLcode res = curl_easy_perform(curl);
+        long httpCode = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+        ok = (res == CURLE_OK && httpCode == 200);
+
+        curl_easy_cleanup(curl);
+    }
+
+    fclose(fp);
+    if (!ok) remove(TECHNOBLADE_SOUND_PATH);
+    return ok;
+}
+
+// Plays TECHNOBLADE_SOUND_PATH once on channel 0, downloading it first if needed.
+static void play_technoblade_sound() {
+    static bool attemptedLoad = false;
+
+    if (!g_ndspReady) {
+        if (R_SUCCEEDED(ndspInit())) g_ndspReady = true;
+    }
+    if (!g_ndspReady) return;
+
+    if (!attemptedLoad) {
+        attemptedLoad = true;
+        ensure_technoblade_sound();
+        load_wav_file(TECHNOBLADE_SOUND_PATH, g_technobladeAudio);
+    }
+    if (!g_technobladeAudio.loaded) return;
+
+    ndspChnReset(0);
+    ndspChnWaveBufClear(0);
+    ndspChnSetInterp(0, NDSP_INTERP_LINEAR);
+    ndspChnSetRate(0, (float)g_technobladeAudio.sampleRate);
+    ndspChnSetFormat(0, g_technobladeAudio.channels == 2 ? NDSP_FORMAT_STEREO_PCM16 : NDSP_FORMAT_MONO_PCM16);
+
+    memset(&g_technobladeWaveBuf, 0, sizeof(g_technobladeWaveBuf));
+    g_technobladeWaveBuf.data_vaddr = g_technobladeAudio.data;
+    g_technobladeWaveBuf.nsamples = g_technobladeAudio.size / (2 * g_technobladeAudio.channels);
+    g_technobladeWaveBuf.looping = false;
+    g_technobladeWaveBuf.status = NDSP_WBUF_FREE;
+
+    DSP_FlushDataCache(g_technobladeAudio.data, g_technobladeAudio.size);
+    ndspChnWaveBufAdd(0, &g_technobladeWaveBuf);
 }
 
 static void init_themes() {
@@ -1359,6 +1505,7 @@ int main(int argc, char **argv) {
                         isAdmin = false;
                         strcpy(username, "Technoblade");
                         firebase_post("messages", "{\"user\":\"System\",\"text\":\"" TECHNOBLADE_JOIN_TEXT "\"}");
+                        play_technoblade_sound();
                     } else {
                         isAdmin = false;
                         strcpy(username, inputName);
@@ -1486,6 +1633,8 @@ int main(int argc, char **argv) {
     curl_global_cleanup();
     socExit();
     if (soc_buffer) free(soc_buffer);
+    if (g_technobladeAudio.data) linearFree(g_technobladeAudio.data);
+    if (g_ndspReady) ndspExit();
     C2D_TextBufDelete(dynamicBuf);
     C2D_Fini();
     C3D_Fini();
