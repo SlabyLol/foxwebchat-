@@ -1,4 +1,5 @@
 #include <3ds.h>
+#include <3ds/services/ps.h>
 #include <citro2d.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +17,6 @@
 #include <3ds/ndsp/ndsp.h>
 
 #define FIREBASE_URL "https://foxwebchat-bd592-default-rtdb.europe-west1.firebasedatabase.app"
-#define ADMIN_CODE "AdminJs93€=no"
 #define TECHNOBLADE_JOIN_TEXT "The Legend is here.... TECHNOBLADE JOINED"
 #define TECHNOBLADE_SOUND_PATH "sdmc:/3ds/FoxWebChat/technoblade.wav"
 #define TECHNOBLADE_SOUND_URL "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/main/tnd.wav"
@@ -127,12 +127,14 @@ static bool secretThemeUnlocked = false;
 struct ChatMessage {
     std::string user;
     std::string text;
+    std::string deviceId;
 };
 
 struct ReportItem {
     std::string user;
     std::string text;
     std::string reason;
+    std::string deviceId;
 };
 
 static char username[64] = "";
@@ -140,6 +142,21 @@ static bool isAdmin = false;
 static bool isKicked = false;
 static bool showAdminPanel = false;
 static char kickReason[128] = "";
+static std::string joinErrorMsg = "";
+static std::string g_deviceIdHex = "";
+
+// Fetches this console's hardware device ID once at startup (used for hidbans).
+static void init_device_id() {
+    if (R_SUCCEEDED(psInit())) {
+        u32 id = 0;
+        if (R_SUCCEEDED(PS_GetDeviceId(&id))) {
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%08lX", (unsigned long)id);
+            g_deviceIdHex = buf;
+        }
+        psExit();
+    }
+}
 
 std::vector<ChatMessage> messageList;
 std::vector<ReportItem> reportList;
@@ -807,6 +824,7 @@ static bool download_theme_file(const RemoteTheme& theme, std::string& statusOut
 
 void check_kick_status() {
     if(strlen(username) == 0) return;
+
     char path[128];
     snprintf(path, sizeof(path), "kicks/%s", username);
     std::string json = firebase_get(path);
@@ -814,9 +832,21 @@ void check_kick_status() {
     if(!json.empty() && json != "null") {
         isKicked = true;
         snprintf(kickReason, sizeof(kickReason), "Kicked by Admin");
-    } else {
-        isKicked = false;
+        return;
     }
+
+    if (!g_deviceIdHex.empty()) {
+        char hidPath[128];
+        snprintf(hidPath, sizeof(hidPath), "hidbans/%s", g_deviceIdHex.c_str());
+        std::string hidJson = firebase_get(hidPath);
+        if (!hidJson.empty() && hidJson != "null") {
+            isKicked = true;
+            snprintf(kickReason, sizeof(kickReason), "This console is hardware-banned");
+            return;
+        }
+    }
+
+    isKicked = false;
 }
 
 std::string parse_json_value(const std::string& block, const std::string& key) {
@@ -835,6 +865,43 @@ std::string parse_json_value(const std::string& block, const std::string& key) {
     return block.substr(startQuote + 1, endQuote - startQuote - 1);
 }
 
+// Parses a flat JSON object of "key":"value" pairs (no nesting), e.g. the
+// "admins" node in Firebase: { "<admin code>": "<admin display name>", ... }
+static std::vector<std::pair<std::string, std::string>> parse_flat_json_object(const std::string& json) {
+    std::vector<std::pair<std::string, std::string>> result;
+    size_t pos = 0;
+
+    while (true) {
+        size_t keyStart = json.find("\"", pos);
+        if (keyStart == std::string::npos) break;
+        size_t keyEnd = json.find("\"", keyStart + 1);
+        if (keyEnd == std::string::npos) break;
+        std::string key = json.substr(keyStart + 1, keyEnd - keyStart - 1);
+
+        size_t colon = json.find(":", keyEnd);
+        if (colon == std::string::npos) break;
+        size_t valStart = json.find("\"", colon);
+        if (valStart == std::string::npos) break;
+        size_t valEnd = json.find("\"", valStart + 1);
+        if (valEnd == std::string::npos) break;
+        std::string val = json.substr(valStart + 1, valEnd - valStart - 1);
+
+        result.push_back({key, val});
+        pos = valEnd + 1;
+    }
+
+    return result;
+}
+
+// Admin codes live in Firebase under "admins": key = admin code, value = display name.
+// Fetched fresh right before checking a join attempt, so newly added/removed
+// codes take effect without needing to rebuild the app.
+static std::vector<std::pair<std::string, std::string>> fetch_admin_codes() {
+    std::string json = firebase_get("admins");
+    if (json.empty() || json == "null") return {};
+    return parse_flat_json_object(json);
+}
+
 void fetch_messages() {
     int previousCount = (int)messageList.size();
 
@@ -850,9 +917,11 @@ void fetch_messages() {
             std::string block = json.substr(pos, endPos - pos + 1);
             std::string text = parse_json_value(block, "text");
             std::string user = parse_json_value(block, "user");
+            std::string deviceId = parse_json_value(block, "deviceId");
+            if (deviceId == "Unknown") deviceId = "";
 
             if (text != "Unknown") {
-                messageList.push_back({user, text});
+                messageList.push_back({user, text, deviceId});
             }
             pos = endPos + 1;
         }
@@ -885,9 +954,11 @@ void fetch_reports() {
             std::string user = parse_json_value(block, "reportedUser");
             std::string text = parse_json_value(block, "messageText");
             std::string reason = parse_json_value(block, "reason");
+            std::string deviceId = parse_json_value(block, "deviceId");
+            if (deviceId == "Unknown") deviceId = "";
 
             if (user != "Unknown") {
-                reportList.push_back({user, text, reason});
+                reportList.push_back({user, text, reason, deviceId});
             }
             pos = endPos + 1;
         }
@@ -1133,13 +1204,27 @@ static void draw_top_screen() {
         for (int i = scrollOffset; i < endIdx; i++) {
             bool sel = i == selectedMsgIndex;
             if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
-            std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, 42);
 
-            bool isTechnobladeJoin = (messageList[i].user == "System") &&
-                                      (messageList[i].text == TECHNOBLADE_JOIN_TEXT);
+            bool isSystemMsg = (messageList[i].user == "System");
+            bool isTechnobladeJoin = isSystemMsg && (messageList[i].text == TECHNOBLADE_JOIN_TEXT);
             u32 lineColor = isTechnobladeJoin ? C2D_Color32(220,30,30,255) : (sel ? C_MID : C_DARK);
 
-            draw_text(8, y, 0.44f, lineColor, line);
+            float textX = 8.0f;
+            if (!isSystemMsg) {
+                float avR = 7.0f;
+                float avCx = 8.0f + avR;
+                float avCy = y + 7.0f;
+                C2D_DrawCircleSolid(avCx, avCy, 0.45f, avR, avatar_color_for_name(messageList[i].user));
+
+                std::string initial = messageList[i].user.empty() ? "?" : messageList[i].user.substr(0, 1);
+                for (auto& c : initial) c = (char)toupper((unsigned char)c);
+                draw_text_centered(avCx, avCy - 6.0f, 0.32f, C_WHITE, initial);
+
+                textX = avCx + avR + 6.0f;
+            }
+
+            std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, isSystemMsg ? 42 : 36);
+            draw_text(textX, y, 0.44f, lineColor, line);
             y += ROW_H;
         }
     }
@@ -1316,6 +1401,7 @@ int main(int argc, char **argv) {
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     dynamicBuf = C2D_TextBufNew(4096);
 
+    init_device_id();
     load_secret_flag();
     init_themes();
     load_theme();
@@ -1529,24 +1615,60 @@ int main(int argc, char **argv) {
                     std::string lowerName = inputName;
                     for (auto& c : lowerName) c = (char)tolower((unsigned char)c);
 
-                    if (strcmp(inputName, ADMIN_CODE) == 0) {
+                    // Admin codes live in Firebase under "admins": code -> display name.
+                    auto adminCodes = fetch_admin_codes();
+
+                    std::string matchedAdminName;
+                    bool isAdminLogin = false;
+                    for (auto& entry : adminCodes) {
+                        if (strcmp(inputName, entry.first.c_str()) == 0) {
+                            isAdminLogin = true;
+                            matchedAdminName = entry.second;
+                            break;
+                        }
+                    }
+
+                    bool isReservedName = false;
+                    if (!isAdminLogin) {
+                        if (lowerName == "admin") {
+                            isReservedName = true;
+                        } else {
+                            for (auto& entry : adminCodes) {
+                                std::string lowerAdminName = entry.second;
+                                for (auto& c : lowerAdminName) c = (char)tolower((unsigned char)c);
+                                if (lowerName == lowerAdminName) { isReservedName = true; break; }
+                            }
+                        }
+                    }
+
+                    if (isAdminLogin) {
                         isAdmin = true;
-                        strcpy(username, "ADMIN");
-                        firebase_post("messages", "{\"user\":\"System\",\"text\":\"ADMIN JOINED!\"}");
+                        joinErrorMsg = "";
+                        strncpy(username, matchedAdminName.empty() ? "ADMIN" : matchedAdminName.c_str(), sizeof(username) - 1);
+                        username[sizeof(username) - 1] = '\0';
+                        char msg[256];
+                        snprintf(msg, sizeof(msg), "{\"user\":\"System\",\"text\":\"%s JOINED!\"}", username);
+                        firebase_post("messages", msg);
+                        fetch_messages();
+                        fetch_reports();
+                    } else if (isReservedName) {
+                        joinErrorMsg = "That name is reserved. Please choose another.";
                     } else if (lowerName == "technoblade") {
                         isAdmin = false;
+                        joinErrorMsg = "";
                         strcpy(username, "Technoblade");
                         firebase_post("messages", "{\"user\":\"System\",\"text\":\"" TECHNOBLADE_JOIN_TEXT "\"}");
                         play_technoblade_sound();
+                        fetch_messages();
                     } else {
                         isAdmin = false;
+                        joinErrorMsg = "";
                         strcpy(username, inputName);
                         char msg[128];
                         snprintf(msg, sizeof(msg), "{\"user\":\"System\",\"text\":\"%s joined\"}", username);
                         firebase_post("messages", msg);
+                        fetch_messages();
                     }
-                    fetch_messages();
-                    if (isAdmin) fetch_reports();
                 }
             }
 
@@ -1571,6 +1693,7 @@ int main(int argc, char **argv) {
 
                 if (kDown & KEY_R) {
                     firebase_delete("kicks");
+                    firebase_delete("hidbans");
                     firebase_post("messages", "{\"user\":\"System\",\"text\":\"All kick data cleared by Admin!\"}");
                 }
             }
@@ -1584,6 +1707,16 @@ int main(int argc, char **argv) {
                     snprintf(kickPath, sizeof(kickPath), "kicks/%s", rep.user.c_str());
                     firebase_put(kickPath, "{\"kicked\":true}");
 
+                    if (!rep.deviceId.empty()) {
+                        char hidPath[160];
+                        snprintf(hidPath, sizeof(hidPath), "hidbans/%s", rep.deviceId.c_str());
+                        char hidPayload[400];
+                        snprintf(hidPayload, sizeof(hidPayload),
+                                 "{\"reason\":\"%s\",\"bannedName\":\"%s\"}",
+                                 rep.reason.c_str(), rep.user.c_str());
+                        firebase_put(hidPath, hidPayload);
+                    }
+
                     char sysMsg[256];
                     snprintf(sysMsg, sizeof(sysMsg), "{\"user\":\"System\",\"text\":\"%s was kicked!\"}", rep.user.c_str());
                     firebase_post("messages", sysMsg);
@@ -1593,8 +1726,9 @@ int main(int argc, char **argv) {
                     char text[256] = "";
                     open_keyboard(text, sizeof(text), "Message...");
                     if (strlen(text) > 0) {
-                        char payload[512];
-                        snprintf(payload, sizeof(payload), "{\"user\":\"%s\",\"text\":\"%s\"}", username, text);
+                        char payload[600];
+                        snprintf(payload, sizeof(payload), "{\"user\":\"%s\",\"text\":\"%s\",\"deviceId\":\"%s\"}",
+                                 username, text, g_deviceIdHex.c_str());
                         firebase_post("messages", payload);
                         followLatestMsg = true;
                         fetch_messages();
@@ -1627,7 +1761,7 @@ int main(int argc, char **argv) {
                 open_keyboard(reason, sizeof(reason), "Report Reason...");
 
                 if (strlen(reason) > 0) {
-                    char reportPayload[512];
+                    char reportPayload[700];
 
                     // Protects the admin: the reporter gets reported instead!
                     if (selected.user == "ADMIN") {
@@ -1635,12 +1769,12 @@ int main(int argc, char **argv) {
                         snprintf(customReason, sizeof(customReason), "[UNO REVERSE] Tried to report Admin! Reason: %s", reason);
 
                         snprintf(reportPayload, sizeof(reportPayload),
-                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}",
-                            username, selected.text.c_str(), customReason, username);
+                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\",\"deviceId\":\"%s\"}",
+                            username, selected.text.c_str(), customReason, username, g_deviceIdHex.c_str());
                     } else {
                         snprintf(reportPayload, sizeof(reportPayload),
-                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\"}",
-                            selected.user.c_str(), selected.text.c_str(), reason, username);
+                            "{\"reportedUser\":\"%s\",\"messageText\":\"%s\",\"reason\":\"%s\",\"reporter\":\"%s\",\"deviceId\":\"%s\"}",
+                            selected.user.c_str(), selected.text.c_str(), reason, username, selected.deviceId.c_str());
                     }
 
                     firebase_post("reports", reportPayload);
