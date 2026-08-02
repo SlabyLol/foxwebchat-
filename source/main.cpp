@@ -184,6 +184,9 @@ static C2D_TextBuf measureBuf; // separate buffer used only for wrap-width measu
 // only forward-declared here since the download functions already need it.
 static void draw_progress_screen(const std::string& label, float progress);
 
+// Used by fetch_messages() before its definition further down.
+static std::vector<std::string> wrap_text_lines(const std::string& fullText, float maxWidth, float scale, int maxLines);
+
 static float g_downloadProgress = 0.0f;   // 0.0 .. 1.0
 static std::string g_downloadLabel = "Downloading...";
 
