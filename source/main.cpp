@@ -1194,6 +1194,12 @@ static void draw_top_screen() {
     if (isAdmin) statusLine += "  (ADMIN)";
     draw_text(150, 12, 0.48f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
 
+    if (!g_deviceIdHex.empty()) {
+    float hidScale = 0.32f;
+    float hidW = measure_text_width(g_deviceIdHex, hidScale);
+    draw_text(SCREEN_W - 8.0f - hidW, 12.0f, hidScale, C_MUTED, g_deviceIdHex);
+}
+
     if (isKicked) {
         draw_text(20, 90, 0.62f, C_ADMIN, "You have been kicked by an Admin!");
         draw_text(20, 118, 0.52f, C_DARK, std::string("Reason: ") + kickReason);
