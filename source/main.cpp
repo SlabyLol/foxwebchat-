@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include <map>
 #include <curl/curl.h>
 #include <3ds/ndsp/ndsp.h>
 
@@ -128,6 +129,7 @@ struct ChatMessage {
     std::string user;
     std::string text;
     std::string deviceId;
+    std::vector<std::string> wrappedLines; // pre-wrapped for display, computed once when fetched
 };
 
 struct ReportItem {
@@ -159,6 +161,7 @@ static void init_device_id() {
 }
 
 std::vector<ChatMessage> messageList;
+static std::map<std::string, std::string> knownDeviceIds; // username -> last known deviceId
 std::vector<ReportItem> reportList;
 int selectedMsgIndex = 0;
 int selectedReportIndex = 0;
@@ -175,6 +178,7 @@ static bool followLatestMsg = true;
 static C3D_RenderTarget* topTarget;
 static C3D_RenderTarget* bottomTarget;
 static C2D_TextBuf dynamicBuf;
+static C2D_TextBuf measureBuf; // separate buffer used only for wrap-width measurement
 
 // Progress display for downloads (update CIA, theme files). Defined further down,
 // only forward-declared here since the download functions already need it.
@@ -904,6 +908,7 @@ static std::vector<std::pair<std::string, std::string>> fetch_admin_codes() {
 
 void fetch_messages() {
     int previousCount = (int)messageList.size();
+    C2D_TextBufClear(measureBuf);
 
     std::string json = firebase_get("messages");
     messageList.clear();
@@ -921,7 +926,19 @@ void fetch_messages() {
             if (deviceId == "Unknown") deviceId = "";
 
             if (text != "Unknown") {
-                messageList.push_back({user, text, deviceId});
+                ChatMessage msg;
+                msg.user = user;
+                msg.text = text;
+                msg.deviceId = deviceId;
+
+                std::string displayLine = "[" + user + "]: " + text;
+                msg.wrappedLines = wrap_text_lines(displayLine, 360.0f, 0.44f, 4);
+
+                messageList.push_back(msg);
+
+                if (user != "System" && !deviceId.empty()) {
+                    knownDeviceIds[user] = deviceId;
+                }
             }
             pos = endPos + 1;
         }
@@ -1076,6 +1093,56 @@ static void draw_text_centered(float centerX, float y, float scale, u32 color, c
     C2D_DrawText(&text, C2D_WithColor, centerX - w/2.0f, y, 0.5f, scale, scale, color);
 }
 
+// Measures a candidate string's on-screen width at the given scale (uses the
+// dedicated measureBuf so it never interferes with per-frame drawing).
+static float measure_text_width(const std::string& str, float scale) {
+    C2D_Text text;
+    C2D_TextParse(&text, measureBuf, str.c_str());
+    C2D_TextOptimize(&text);
+    float w, h;
+    C2D_TextGetDimensions(&text, scale, scale, &w, &h);
+    return w;
+}
+
+// Splits a long line into up to maxLines lines that each fit within maxWidth
+// pixels, breaking on word boundaries (falls back to a hard character break
+// for a single very long word). If content remains after maxLines, the last
+// line gets an ellipsis. Computed once per message (not every frame).
+static std::vector<std::string> wrap_text_lines(const std::string& fullText, float maxWidth, float scale, int maxLines) {
+    std::vector<std::string> lines;
+    std::string remaining = fullText;
+
+    while (!remaining.empty() && (int)lines.size() < maxLines) {
+        if (measure_text_width(remaining, scale) <= maxWidth) {
+            lines.push_back(remaining);
+            remaining.clear();
+            break;
+        }
+
+        std::string candidate = remaining;
+        while (candidate.size() > 1 && measure_text_width(candidate, scale) > maxWidth) {
+            size_t cut = candidate.find_last_of(' ');
+            if (cut == std::string::npos || cut == 0) {
+                candidate.pop_back(); // no good word break - shrink char by char
+            } else {
+                candidate = candidate.substr(0, cut);
+            }
+        }
+
+        lines.push_back(candidate);
+        remaining = remaining.substr(candidate.size());
+        while (!remaining.empty() && remaining[0] == ' ') remaining.erase(0, 1);
+    }
+
+    if (!remaining.empty() && !lines.empty()) {
+        std::string& last = lines.back();
+        if (last.size() > 3) last = last.substr(0, last.size() - 3) + "...";
+        else last += "...";
+    }
+
+    return lines;
+}
+
 // Fox head in a flat style (matching the icon & banner), drawn purely with vectors
 static void draw_fox(float cx, float cy, float w) {
     // Ears (white outside)
@@ -1187,23 +1254,32 @@ static void draw_top_screen() {
         draw_text(8, y, 0.48f, C_MUTED, "No messages available.");
     } else {
         int total = (int)messageList.size();
-        int maxVisible = std::max(1, (int)((LIST_BOTTOM - y) / ROW_H));
-        int scrollOffset = 0;
-        if (total > maxVisible) {
-            scrollOffset = selectedMsgIndex - maxVisible + 1;
-            if (scrollOffset < 0) scrollOffset = 0;
-            int maxOffset = total - maxVisible;
-            if (scrollOffset > maxOffset) scrollOffset = maxOffset;
+        float availableHeight = LIST_BOTTOM - y;
 
+        // Walk backward from the selected message, including as many preceding
+        // messages as fit. Mirrors the old fixed-row-height windowing, but now
+        // accounts for messages that wrap across multiple lines.
+        int scrollOffset = selectedMsgIndex;
+        float usedHeight = messageList[selectedMsgIndex].wrappedLines.size() * (float)ROW_H;
+        while (scrollOffset > 0) {
+            float nextHeight = messageList[scrollOffset - 1].wrappedLines.size() * (float)ROW_H;
+            if (usedHeight + nextHeight > availableHeight) break;
+            usedHeight += nextHeight;
+            scrollOffset--;
+        }
+
+        if (scrollOffset > 0) {
             char counter[32];
-            snprintf(counter, sizeof(counter), "%d-%d/%d", scrollOffset + 1, std::min(total, scrollOffset + maxVisible), total);
+            snprintf(counter, sizeof(counter), "%d-%d/%d", scrollOffset + 1, total, total);
             draw_text(SCREEN_W - 70, y - 16, 0.32f, C_MUTED, counter);
         }
-        int endIdx = std::min(total, scrollOffset + maxVisible);
 
-        for (int i = scrollOffset; i < endIdx; i++) {
+        for (int i = scrollOffset; i < total && y < LIST_BOTTOM; i++) {
             bool sel = i == selectedMsgIndex;
-            if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, 18, C_SELECT_BG);
+            int lineCount = (int)messageList[i].wrappedLines.size();
+            float blockH = lineCount * (float)ROW_H;
+
+            if (sel) C2D_DrawRectSolid(4, y-2, 0.4f, SCREEN_W-8, blockH, C_SELECT_BG);
 
             bool isSystemMsg = (messageList[i].user == "System");
             bool isTechnobladeJoin = isSystemMsg && (messageList[i].text == TECHNOBLADE_JOIN_TEXT);
@@ -1223,9 +1299,10 @@ static void draw_top_screen() {
                 textX = avCx + avR + 6.0f;
             }
 
-            std::string line = "[" + messageList[i].user + "]: " + truncate_text(messageList[i].text, isSystemMsg ? 42 : 36);
-            draw_text(textX, y, 0.44f, lineColor, line);
-            y += ROW_H;
+            for (auto& ln : messageList[i].wrappedLines) {
+                draw_text(textX, y, 0.44f, lineColor, ln);
+                y += ROW_H;
+            }
         }
     }
 }
@@ -1400,6 +1477,7 @@ int main(int argc, char **argv) {
     topTarget = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     dynamicBuf = C2D_TextBufNew(4096);
+    measureBuf = C2D_TextBufNew(2048);
 
     init_device_id();
     load_secret_flag();
@@ -1467,6 +1545,7 @@ int main(int argc, char **argv) {
         socExit();
         if (soc_buffer) free(soc_buffer);
         C2D_TextBufDelete(dynamicBuf);
+        C2D_TextBufDelete(measureBuf);
         C2D_Fini();
         C3D_Fini();
         gfxExit();
@@ -1696,6 +1775,31 @@ int main(int argc, char **argv) {
                     firebase_delete("hidbans");
                     firebase_post("messages", "{\"user\":\"System\",\"text\":\"All kick data cleared by Admin!\"}");
                 }
+
+                if (kDown & KEY_A) {
+                    char banName[64] = "";
+                    open_keyboard(banName, sizeof(banName), "Username to ban");
+                    if (strlen(banName) > 0) {
+                        char kickPath[128];
+                        snprintf(kickPath, sizeof(kickPath), "kicks/%s", banName);
+                        firebase_put(kickPath, "{\"reason\":\"Banned by Admin\"}");
+
+                        auto it = knownDeviceIds.find(banName);
+                        if (it != knownDeviceIds.end() && !it->second.empty()) {
+                            char hidPath[160];
+                            snprintf(hidPath, sizeof(hidPath), "hidbans/%s", it->second.c_str());
+                            char hidPayload[300];
+                            snprintf(hidPayload, sizeof(hidPayload),
+                                     "{\"reason\":\"Banned by Admin\",\"bannedName\":\"%s\"}", banName);
+                            firebase_put(hidPath, hidPayload);
+                        }
+
+                        char sysMsg[256];
+                        snprintf(sysMsg, sizeof(sysMsg), "{\"user\":\"System\",\"text\":\"%s was banned by an Admin.\"}", banName);
+                        firebase_post("messages", sysMsg);
+                        fetch_messages();
+                    }
+                }
             }
 
             // SEND MESSAGE / KICK (X)
@@ -1802,6 +1906,7 @@ int main(int argc, char **argv) {
     if (g_technobladeAudio.data) linearFree(g_technobladeAudio.data);
     if (g_ndspReady) ndspExit();
     C2D_TextBufDelete(dynamicBuf);
+    C2D_TextBufDelete(measureBuf);
     C2D_Fini();
     C3D_Fini();
     gfxExit();
