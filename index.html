@@ -347,35 +347,9 @@
     color: var(--muted);
     margin-top: 24px;
   }
-
-  /* GitHub button in the top-right corner */
-  .github-btn {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    z-index: 1002;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(135deg, var(--orange), var(--orange-dark));
-    color: white;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-weight: 600;
-    text-decoration: none;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.35), 0 0 0 3px rgba(0,0,0,0.02) inset;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
-  }
-  .github-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,0.45); }
-  .github-btn:active { transform: translateY(0); }
-  .github-btn small { font-weight: 600; text-transform: none; }
-
 </style>
 </head>
 <body>
-
-<!-- GitHub button added in the top-right corner -->
-<a class="github-btn" href="https://github.com/SlabyLol/foxwebchat-" target="_blank" rel="noopener noreferrer">click here</a>
 
 <div class="wrap">
   <header>
@@ -404,6 +378,7 @@
       <input id="nameInput" placeholder="Enter name">
       <button id="joinBtn">Join</button>
     </div>
+    <div id="joinError" style="display:none; color:var(--admin-red); font-size:12px; margin-top:8px;"></div>
   </div>
 
   <div class="card">
@@ -436,7 +411,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
-import { getDatabase, ref, push, onChildAdded, remove, set, onValue }
+import { getDatabase, ref, push, onChildAdded, remove, set, onValue, get }
 from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
 
 /* ---------- FIREBASE CONFIG ---------- */
@@ -455,6 +430,18 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 let username = "";
+
+/* ---------- DEVICE ID (web equivalent of the 3DS hardware ID) ---------- */
+function getDeviceId(){
+  let id = localStorage.getItem("fwc_device_id");
+  if(!id){
+    id = Array.from(crypto.getRandomValues(new Uint8Array(8)))
+      .map(b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+    localStorage.setItem("fwc_device_id", id);
+  }
+  return id;
+}
+const deviceId = getDeviceId();
 
 /* ---------- AVATAR COLOR HELPER ---------- */
 function avatarColor(name){
@@ -539,7 +526,6 @@ document.addEventListener("keydown", (e) => {
 applyTheme(localStorage.getItem("fwc_theme") || "orange");
 
 let isAdmin = false;
-const ADMIN_CODE = "AdminJs93€=no";
 const TECHNOBLADE_JOIN_TEXT = "The Legend is here.... TECHNOBLADE JOINED";
 
 function playTechnobladeSound(){
@@ -550,27 +536,77 @@ function playTechnobladeSound(){
 }
 
 /* ---------- JOIN FUNCTION ---------- */
-function joinChat() {
+async function joinChat() {
   if(username) return; // Already joined
 
-  username = document.getElementById("nameInput").value.trim();
-  if(!username) return alert("Please enter a name");
+  const errorBox = document.getElementById("joinError");
+  errorBox.style.display = "none";
 
-  if(username === ADMIN_CODE){
+  const enteredName = document.getElementById("nameInput").value.trim();
+  if(!enteredName) return alert("Please enter a name");
+
+  const joinBtn = document.getElementById("joinBtn");
+  joinBtn.disabled = true;
+
+  // Hardware-ID ban check: blocks joining outright, regardless of name chosen.
+  try {
+    const hidSnap = await get(ref(db, "hidbans/"+deviceId));
+    if(hidSnap.exists()){
+      showKickScreen(hidSnap.val().reason || "This device is banned");
+      return;
+    }
+  } catch(e) {
+    // offline etc. - fall through and let the normal onValue watcher catch it later
+  }
+
+  // Admin codes live in Firebase under "admins": code -> display name.
+  let adminEntries = [];
+  try {
+    const snap = await get(ref(db, "admins"));
+    if(snap.exists()){
+      adminEntries = Object.entries(snap.val());
+    }
+  } catch(e) {
+    // If this fails (offline etc.), just proceed as if there are no admin codes
+  }
+
+  const lowerEntered = enteredName.toLowerCase();
+  let matchedAdminName = null;
+  for(const [code, name] of adminEntries){
+    if(enteredName === code){ matchedAdminName = name; break; }
+  }
+
+  let isReserved = false;
+  if(!matchedAdminName){
+    if(lowerEntered === "admin"){
+      isReserved = true;
+    } else {
+      for(const [, name] of adminEntries){
+        if(lowerEntered === String(name).toLowerCase()){ isReserved = true; break; }
+      }
+    }
+  }
+
+  if(matchedAdminName){
     isAdmin = true;
-    username = "ADMIN";
+    username = matchedAdminName;
     document.getElementById("adminPanel").style.display = "block";
-    push(ref(db,"messages"), {user:"System", text:"ADMIN JOINED - WARNING!"});
-  } else if(username.toLowerCase() === "technoblade"){
+    push(ref(db,"messages"), {user:"System", text:username + " JOINED!"});
+  } else if(isReserved){
+    joinBtn.disabled = false;
+    errorBox.textContent = "That name is reserved. Please choose another.";
+    errorBox.style.display = "block";
+    return;
+  } else if(lowerEntered === "technoblade"){
     username = "Technoblade";
     push(ref(db,"messages"), {user:"System", text:TECHNOBLADE_JOIN_TEXT});
     playTechnobladeSound();
   } else {
+    username = enteredName;
     push(ref(db,"messages"), {user:"System", text:username + " joined"});
   }
 
   document.getElementById("nameInput").disabled = true;
-  document.getElementById("joinBtn").disabled = true;
   document.getElementById("msgInput").disabled = false;
   document.getElementById("sendBtn").disabled = false;
   document.getElementById("msgInput").focus();
@@ -589,7 +625,7 @@ function sendMessage() {
   const text = input.value.trim();
   if(!text) return;
 
-  push(ref(db,"messages"), {user:username, text:text});
+  push(ref(db,"messages"), {user:username, text:text, deviceId:deviceId});
   input.value = "";
   input.focus();
 }
@@ -655,10 +691,12 @@ onChildAdded(ref(db,"messages"), snap => {
           reportedUser: username,
           messageText: "Tried to report ADMIN",
           reason: "Attempted to report Admin",
-          reporter: username
+          reporter: username,
+          deviceId: deviceId
         });
 
-        set(ref(db,"kicks/+username"), { reason:"Attempted to report Admin" });
+        set(ref(db,"kicks/"+username), { reason:"Attempted to report Admin" });
+        set(ref(db,"hidbans/"+deviceId), { reason:"Attempted to report Admin", bannedName:username });
       };
 
       div.appendChild(reportBtn);
@@ -676,7 +714,8 @@ onChildAdded(ref(db,"messages"), snap => {
           messageText: data.text,
           messageId: messageId,
           reason: reason,
-          reporter: username
+          reporter: username,
+          deviceId: data.deviceId || ""
         });
       };
 
@@ -708,7 +747,10 @@ onChildAdded(ref(db,"reports"), snap => {
   kickBtn.textContent = "Kick";
 
   kickBtn.onclick = () => {
-    set(ref(db,"kicks/+data.reportedUser"), { reason:data.reason });
+    set(ref(db,"kicks/"+data.reportedUser), { reason:data.reason });
+    if(data.deviceId){
+      set(ref(db,"hidbans/"+data.deviceId), { reason:data.reason, bannedName:data.reportedUser });
+    }
     push(ref(db,"messages"), { user:"System", text:data.reportedUser + " got kicked. Reason: "+data.reason });
     box.remove();
   };
@@ -738,16 +780,16 @@ onChildAdded(ref(db,"kicks"), snap => {
     const messagesRef = ref(db,"messages");
     onChildAdded(messagesRef, msgSnap => {
       const msgData = msgSnap.val();
-      if(msgData.user === user) remove(ref(db,"messages/+msgSnap.key"));
+      if(msgData.user === user) remove(ref(db,"messages/"+msgSnap.key));
     });
 
     const reportsRef = ref(db,"reports");
     onChildAdded(reportsRef, repSnap => {
       const repData = repSnap.val();
-      if(repData.reportedUser === user) remove(ref(db,"reports/+repSnap.key"));
+      if(repData.reportedUser === user) remove(ref(db,"reports/"+repSnap.key));
     });
 
-    remove(ref(db,"kicks/+user"));
+    remove(ref(db,"kicks/"+user));
     div.remove();
   };
 
@@ -761,9 +803,14 @@ document.getElementById("clearReportsBtn").onclick = () => { if(isAdmin) remove(
 
 /* ---------- WATCH KICK STATUS ---------- */
 function watchKickStatus(){
-  const kickRef = ref(db,"kicks/+username");
+  const kickRef = ref(db,"kicks/"+username);
   onValue(kickRef, snap => {
     if(snap.exists()) showKickScreen(snap.val().reason);
+  });
+
+  const hidRef = ref(db,"hidbans/"+deviceId);
+  onValue(hidRef, snap => {
+    if(snap.exists()) showKickScreen(snap.val().reason || "This device is banned");
   });
 }
 
