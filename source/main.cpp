@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <cctype>
 #include <utility>
+#include <ctime>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -183,9 +184,6 @@ static C2D_TextBuf measureBuf; // separate buffer used only for wrap-width measu
 // Progress display for downloads (update CIA, theme files). Defined further down,
 // only forward-declared here since the download functions already need it.
 static void draw_progress_screen(const std::string& label, float progress);
-
-// Used by fetch_messages() before its definition further down.
-static std::vector<std::string> wrap_text_lines(const std::string& fullText, float maxWidth, float scale, int maxLines);
 
 static float g_downloadProgress = 0.0f;   // 0.0 .. 1.0
 static std::string g_downloadLabel = "Downloading...";
@@ -832,14 +830,22 @@ static bool download_theme_file(const RemoteTheme& theme, std::string& statusOut
 void check_kick_status() {
     if(strlen(username) == 0) return;
 
+    time_t now = time(NULL);
+
     char path[128];
     snprintf(path, sizeof(path), "kicks/%s", username);
     std::string json = firebase_get(path);
 
     if(!json.empty() && json != "null") {
-        isKicked = true;
-        snprintf(kickReason, sizeof(kickReason), "Kicked by Admin");
-        return;
+        long expiresAt = parse_json_number(json, "expiresAt");
+        if (expiresAt == 0 || (time_t)expiresAt > now) {
+            isKicked = true;
+            std::string reason = parse_json_value(json, "reason");
+            snprintf(kickReason, sizeof(kickReason), "%s", reason == "Unknown" ? "Kicked by Admin" : reason.c_str());
+            return;
+        } else {
+            firebase_delete(path); // ban expired - clean up
+        }
     }
 
     if (!g_deviceIdHex.empty()) {
@@ -847,9 +853,14 @@ void check_kick_status() {
         snprintf(hidPath, sizeof(hidPath), "hidbans/%s", g_deviceIdHex.c_str());
         std::string hidJson = firebase_get(hidPath);
         if (!hidJson.empty() && hidJson != "null") {
-            isKicked = true;
-            snprintf(kickReason, sizeof(kickReason), "This console is hardware-banned");
-            return;
+            long expiresAt = parse_json_number(hidJson, "expiresAt");
+            if (expiresAt == 0 || (time_t)expiresAt > now) {
+                isKicked = true;
+                snprintf(kickReason, sizeof(kickReason), "This console is hardware-banned");
+                return;
+            } else {
+                firebase_delete(hidPath); // ban expired - clean up
+            }
         }
     }
 
@@ -870,6 +881,20 @@ std::string parse_json_value(const std::string& block, const std::string& key) {
     if (endQuote == std::string::npos) return "Unknown";
 
     return block.substr(startQuote + 1, endQuote - startQuote - 1);
+}
+
+// Parses an unquoted numeric JSON value, e.g. "expiresAt":1735689600
+static long parse_json_number(const std::string& block, const std::string& key) {
+    size_t keyPos = block.find("\"" + key + "\"");
+    if (keyPos == std::string::npos) return 0;
+
+    size_t colonPos = block.find(":", keyPos);
+    if (colonPos == std::string::npos) return 0;
+
+    size_t start = colonPos + 1;
+    while (start < block.size() && isspace((unsigned char)block[start])) start++;
+
+    return strtol(block.c_str() + start, nullptr, 10);
 }
 
 // Parses a flat JSON object of "key":"value" pairs (no nesting), e.g. the
@@ -1193,12 +1218,6 @@ static void draw_top_screen() {
     std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
     if (isAdmin) statusLine += "  (ADMIN)";
     draw_text(150, 12, 0.48f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
-
-    if (!g_deviceIdHex.empty()) {
-    float hidScale = 0.32f;
-    float hidW = measure_text_width(g_deviceIdHex, hidScale);
-    draw_text(SCREEN_W - 8.0f - hidW, 12.0f, hidScale, C_MUTED, g_deviceIdHex);
-}
 
     if (isKicked) {
         draw_text(20, 90, 0.62f, C_ADMIN, "You have been kicked by an Admin!");
@@ -1787,26 +1806,40 @@ int main(int argc, char **argv) {
 
                 if (kDown & KEY_A) {
                     char banName[64] = "";
-                    open_keyboard(banName, sizeof(banName), "Username to ban");
+                    open_keyboard(banName, sizeof(banName), "Username to hw-ban");
                     if (strlen(banName) > 0) {
-                        char kickPath[128];
-                        snprintf(kickPath, sizeof(kickPath), "kicks/%s", banName);
-                        firebase_put(kickPath, "{\"reason\":\"Banned by Admin\"}");
-
                         auto it = knownDeviceIds.find(banName);
-                        if (it != knownDeviceIds.end() && !it->second.empty()) {
+                        if (it == knownDeviceIds.end() || it->second.empty()) {
+                            char sysMsg[256];
+                            snprintf(sysMsg, sizeof(sysMsg),
+                                     "{\"user\":\"System\",\"text\":\"No known device ID for %s - cannot hardware-ban.\"}", banName);
+                            firebase_post("messages", sysMsg);
+                            fetch_messages();
+                        } else {
+                            char durStr[16] = "";
+                            open_keyboard(durStr, sizeof(durStr), "Minutes (0=permanent)");
+                            long minutes = strlen(durStr) > 0 ? strtol(durStr, nullptr, 10) : 0;
+                            long expiresAt = minutes > 0 ? (long)time(NULL) + minutes * 60 : 0;
+
                             char hidPath[160];
                             snprintf(hidPath, sizeof(hidPath), "hidbans/%s", it->second.c_str());
-                            char hidPayload[300];
+                            char hidPayload[320];
                             snprintf(hidPayload, sizeof(hidPayload),
-                                     "{\"reason\":\"Banned by Admin\",\"bannedName\":\"%s\"}", banName);
+                                     "{\"reason\":\"Banned by Admin\",\"bannedName\":\"%s\",\"expiresAt\":%ld}",
+                                     banName, expiresAt);
                             firebase_put(hidPath, hidPayload);
-                        }
 
-                        char sysMsg[256];
-                        snprintf(sysMsg, sizeof(sysMsg), "{\"user\":\"System\",\"text\":\"%s was banned by an Admin.\"}", banName);
-                        firebase_post("messages", sysMsg);
-                        fetch_messages();
+                            char sysMsg[300];
+                            if (minutes > 0) {
+                                snprintf(sysMsg, sizeof(sysMsg),
+                                         "{\"user\":\"System\",\"text\":\"%s's device was hardware-banned for %ld minutes.\"}", banName, minutes);
+                            } else {
+                                snprintf(sysMsg, sizeof(sysMsg),
+                                         "{\"user\":\"System\",\"text\":\"%s's device was hardware-banned by an Admin.\"}", banName);
+                            }
+                            firebase_post("messages", sysMsg);
+                            fetch_messages();
+                        }
                     }
                 }
             }
@@ -1816,22 +1849,26 @@ int main(int argc, char **argv) {
                 if (showAdminPanel && isAdmin && !reportList.empty()) {
                     ReportItem rep = reportList[selectedReportIndex];
 
+                    char durStr[16] = "";
+                    open_keyboard(durStr, sizeof(durStr), "Minutes (0=permanent)");
+                    long minutes = strlen(durStr) > 0 ? strtol(durStr, nullptr, 10) : 0;
+                    long expiresAt = minutes > 0 ? (long)time(NULL) + minutes * 60 : 0;
+
                     char kickPath[128];
                     snprintf(kickPath, sizeof(kickPath), "kicks/%s", rep.user.c_str());
-                    firebase_put(kickPath, "{\"kicked\":true}");
+                    char kickPayload[500];
+                    snprintf(kickPayload, sizeof(kickPayload),
+                             "{\"reason\":\"%s\",\"expiresAt\":%ld}", rep.reason.c_str(), expiresAt);
+                    firebase_put(kickPath, kickPayload);
 
-                    if (!rep.deviceId.empty()) {
-                        char hidPath[160];
-                        snprintf(hidPath, sizeof(hidPath), "hidbans/%s", rep.deviceId.c_str());
-                        char hidPayload[400];
-                        snprintf(hidPayload, sizeof(hidPayload),
-                                 "{\"reason\":\"%s\",\"bannedName\":\"%s\"}",
-                                 rep.reason.c_str(), rep.user.c_str());
-                        firebase_put(hidPath, hidPayload);
+                    char sysMsg[300];
+                    if (minutes > 0) {
+                        snprintf(sysMsg, sizeof(sysMsg),
+                                 "{\"user\":\"System\",\"text\":\"%s was kicked for %ld minutes!\"}", rep.user.c_str(), minutes);
+                    } else {
+                        snprintf(sysMsg, sizeof(sysMsg),
+                                 "{\"user\":\"System\",\"text\":\"%s was kicked!\"}", rep.user.c_str());
                     }
-
-                    char sysMsg[256];
-                    snprintf(sysMsg, sizeof(sysMsg), "{\"user\":\"System\",\"text\":\"%s was kicked!\"}", rep.user.c_str());
                     firebase_post("messages", sysMsg);
 
                     fetch_reports();
