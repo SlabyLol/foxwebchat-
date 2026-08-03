@@ -397,9 +397,9 @@
       <button id="clearReportsBtn">Delete All Reports</button>
     </div>
 
-    <h4>Ban a User</h4>
+    <h4>Hardware-Ban a User</h4>
     <div class="join-row">
-      <input id="banNameInput" placeholder="Username to ban">
+      <input id="banNameInput" placeholder="Username to hw-ban">
       <button id="banUserBtn" style="background:var(--admin-red);">Ban</button>
     </div>
 
@@ -760,9 +760,6 @@ onChildAdded(ref(db,"reports"), snap => {
 
   kickBtn.onclick = () => {
     set(ref(db,"kicks/"+data.reportedUser), { reason:data.reason });
-    if(data.deviceId){
-      set(ref(db,"hidbans/"+data.deviceId), { reason:data.reason, bannedName:data.reportedUser });
-    }
     push(ref(db,"messages"), { user:"System", text:data.reportedUser + " got kicked. Reason: "+data.reason });
     box.remove();
   };
@@ -813,21 +810,22 @@ onChildAdded(ref(db,"kicks"), snap => {
 document.getElementById("clearChatBtn").onclick = () => { if(isAdmin) remove(ref(db,"messages")); };
 document.getElementById("clearReportsBtn").onclick = () => { if(isAdmin) remove(ref(db,"reports")); };
 
-/* ---------- MANUAL BAN ---------- */
+/* ---------- MANUAL HARDWARE BAN ---------- */
 document.getElementById("banUserBtn").onclick = () => {
   if(!isAdmin) return;
   const input = document.getElementById("banNameInput");
   const name = input.value.trim();
   if(!name) return;
 
-  set(ref(db,"kicks/"+name), { reason:"Banned by Admin" });
-
   const knownId = knownDeviceIds[name];
-  if(knownId){
-    set(ref(db,"hidbans/"+knownId), { reason:"Banned by Admin", bannedName:name });
+  if(!knownId){
+    push(ref(db,"messages"), { user:"System", text:"No known device ID for " + name + " - cannot hardware-ban." });
+    input.value = "";
+    return;
   }
 
-  push(ref(db,"messages"), { user:"System", text:name + " was banned by an Admin." });
+  set(ref(db,"hidbans/"+knownId), { reason:"Banned by Admin", bannedName:name });
+  push(ref(db,"messages"), { user:"System", text:name + "'s device was hardware-banned by an Admin." });
   input.value = "";
 };
 document.getElementById("banNameInput").addEventListener("keypress", (e) => {
