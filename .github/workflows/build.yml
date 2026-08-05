@@ -50,7 +50,7 @@ jobs:
         tag_name: nightly
         name: "Nightly Build"
         prerelease: false
-        body: "Automatic Build Release"
+        body: "Public Chat"
         files: |
           ./*.cia
           ./*.3dsx
