@@ -362,7 +362,8 @@ static void ensure_custom_themes_dir() {
             fprintf(fp,
                 "# FoxWebChat theme file (.fwct)\n"
                 "# Colors as R,G,B,A (0-255, A optional, defaults to 255). Lines starting with # are comments.\n"
-                "# Copy this file, rename it, and tweak the values to make your own theme.\n"
+                "# Copy this file, rename it, and tweak the values to make your own themeor make it whit web editor.\n"
+                "# Have fun :).\n"
                 "name=My Theme\n"
                 "bg=247,127,51\n"
                 "mid=225,90,35\n"
