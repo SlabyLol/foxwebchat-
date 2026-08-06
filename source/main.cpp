@@ -293,6 +293,11 @@ static void ensure_dir(const char* path) {
     }
 }
 
+// Forward declarations - defined further down, but needed by functions above them.
+std::string parse_json_value(const std::string& block, const std::string& key);
+static long parse_json_number(const std::string& block, const std::string& key);
+static std::vector<std::string> wrap_text_lines(const std::string& fullText, float maxWidth, float scale, int maxLines);
+
 // Parses a single "r,g,b(,a)" line from a .fwct file
 static bool parse_fwct_color(const std::string& value, u32& outColor) {
     int r = 0, g = 0, b = 0, a = 255;
@@ -362,8 +367,7 @@ static void ensure_custom_themes_dir() {
             fprintf(fp,
                 "# FoxWebChat theme file (.fwct)\n"
                 "# Colors as R,G,B,A (0-255, A optional, defaults to 255). Lines starting with # are comments.\n"
-                "# Copy this file, rename it, and tweak the values to make your own themeor make it whit web editor.\n"
-                "# Have fun :).\n"
+                "# Copy this file, rename it, and tweak the values to make your own theme.\n"
                 "name=My Theme\n"
                 "bg=247,127,51\n"
                 "mid=225,90,35\n"
@@ -1203,6 +1207,45 @@ static void draw_fox(float cx, float cy, float w) {
                       cx,          cy+w*0.14f+w*0.045f*1.3f, C_DARK, 0.5f);
 }
 
+static bool is_secret_theme_active() {
+    return currentTheme->name.find("Secret") != std::string::npos;
+}
+
+// A small 4-point sparkle star, built from four thin triangles.
+static void draw_sparkle_star(float cx, float cy, float size, u32 color) {
+    C2D_DrawTriangle(cx, cy-size, color, cx+size*0.28f, cy, color, cx, cy+size, color, 0.55f);
+    C2D_DrawTriangle(cx, cy-size, color, cx-size*0.28f, cy, color, cx, cy+size, color, 0.55f);
+    C2D_DrawTriangle(cx-size, cy, color, cx, cy-size*0.28f, color, cx+size, cy, color, 0.55f);
+    C2D_DrawTriangle(cx-size, cy, color, cx, cy+size*0.28f, color, cx+size, cy, color, 0.55f);
+}
+
+// Scatters a handful of twinkling sparkles across the screen - only visible
+// while the Secret Fox theme is active. Twinkle is time-based so it animates
+// smoothly frame to frame without needing any extra state.
+static void draw_secret_sparkles(float screenW, float screenH, int seedOffset) {
+    if (!is_secret_theme_active()) return;
+
+    u64 t = osGetTime();
+    struct SparklePos { float x, y, baseSize; };
+    static const SparklePos positions[] = {
+        {30, 20, 4.0f}, {370, 15, 3.0f}, {60, 60, 3.5f}, {340, 70, 4.5f},
+        {200, 10, 3.0f}, {15, 100, 3.5f}, {385, 110, 3.0f}, {150, 130, 4.0f},
+        {260, 155, 3.2f}, {95, 175, 3.8f},
+    };
+    for (size_t i = 0; i < sizeof(positions)/sizeof(positions[0]); i++) {
+        if (positions[i].x > screenW || positions[i].y > screenH) continue;
+
+        u64 phase = (t / 120 + i * 37 + (u64)seedOffset * 91) % 100;
+        float triangle = (float)(phase < 50 ? phase : 100 - phase) / 50.0f; // 0..1..0
+        float twinkle = 0.35f + 0.65f * triangle;
+
+        float size = positions[i].baseSize * (0.6f + 0.5f * twinkle);
+        u8 alpha = (u8)(90 + 165 * twinkle);
+        u32 col = C2D_Color32(255, 240, 180, alpha);
+        draw_sparkle_star(positions[i].x, positions[i].y, size, col);
+    }
+}
+
 // ---------------------------------------------------------------------
 // Top screen: title, status lines, message/report list
 // ---------------------------------------------------------------------
@@ -1219,6 +1262,8 @@ static void draw_top_screen() {
     std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
     if (isAdmin) statusLine += "  (ADMIN)";
     draw_text(150, 12, 0.48f, isAdmin ? C2D_Color32(255,225,120,255) : C_WHITE, statusLine);
+
+    draw_secret_sparkles(SCREEN_W, HEADER_H, 0);
 
     if (isKicked) {
         draw_text(20, 90, 0.62f, C_ADMIN, "You have been kicked by an Admin!");
