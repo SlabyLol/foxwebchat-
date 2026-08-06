@@ -11,6 +11,7 @@
 #include <cctype>
 #include <utility>
 #include <ctime>
+#include <cmath>
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -1219,31 +1220,68 @@ static void draw_sparkle_star(float cx, float cy, float size, u32 color) {
     C2D_DrawTriangle(cx-size, cy, color, cx, cy+size*0.28f, color, cx+size, cy, color, 0.55f);
 }
 
-// Scatters a handful of twinkling sparkles across the screen - only visible
-// while the Secret Fox theme is active. Twinkle is time-based so it animates
-// smoothly frame to frame without needing any extra state.
+// Scatters a generous field of twinkling, multi-colored sparkles across the
+// screen - only visible while the Secret Fox theme is active. Twinkle is
+// time-based so it animates smoothly frame to frame without extra state.
 static void draw_secret_sparkles(float screenW, float screenH, int seedOffset) {
     if (!is_secret_theme_active()) return;
 
     u64 t = osGetTime();
-    struct SparklePos { float x, y, baseSize; };
+    struct SparklePos { float x, y, baseSize; u8 tint; }; // tint: 0=gold,1=white,2=pink
     static const SparklePos positions[] = {
-        {30, 20, 4.0f}, {370, 15, 3.0f}, {60, 60, 3.5f}, {340, 70, 4.5f},
-        {200, 10, 3.0f}, {15, 100, 3.5f}, {385, 110, 3.0f}, {150, 130, 4.0f},
-        {260, 155, 3.2f}, {95, 175, 3.8f},
+        {30, 20, 4.0f, 0}, {370, 15, 3.0f, 1}, {60, 60, 3.5f, 2}, {340, 70, 4.5f, 0},
+        {200, 10, 3.0f, 1}, {15, 100, 3.5f, 0}, {385, 110, 3.0f, 2}, {150, 130, 4.0f, 1},
+        {260, 155, 3.2f, 0}, {95, 175, 3.8f, 2}, {230, 40, 2.6f, 1}, {310, 190, 3.4f, 0},
+        {50, 205, 3.0f, 2}, {180, 200, 2.8f, 1}, {5, 45, 2.4f, 0}, {398, 200, 2.6f, 2},
     };
     for (size_t i = 0; i < sizeof(positions)/sizeof(positions[0]); i++) {
         if (positions[i].x > screenW || positions[i].y > screenH) continue;
 
-        u64 phase = (t / 120 + i * 37 + (u64)seedOffset * 91) % 100;
+        u64 phase = (t / 100 + i * 33 + (u64)seedOffset * 91) % 100;
         float triangle = (float)(phase < 50 ? phase : 100 - phase) / 50.0f; // 0..1..0
-        float twinkle = 0.35f + 0.65f * triangle;
+        float twinkle = 0.30f + 0.70f * triangle;
 
-        float size = positions[i].baseSize * (0.6f + 0.5f * twinkle);
-        u8 alpha = (u8)(90 + 165 * twinkle);
-        u32 col = C2D_Color32(255, 240, 180, alpha);
+        float size = positions[i].baseSize * (0.55f + 0.6f * twinkle);
+        u8 alpha = (u8)(80 + 175 * twinkle);
+
+        u32 col;
+        switch (positions[i].tint) {
+            case 1:  col = C2D_Color32(255, 255, 255, alpha); break;          // white
+            case 2:  col = C2D_Color32(255, 200, 220, alpha); break;          // soft pink
+            default: col = C2D_Color32(255, 225, 140, alpha); break;          // gold
+        }
         draw_sparkle_star(positions[i].x, positions[i].y, size, col);
     }
+}
+
+// Soft pulsing glow ring, drawn behind the fox only for the Secret Fox theme -
+// makes it feel like the mascot itself is radiating a bit of magic.
+static void draw_secret_glow_ring(float cx, float cy, float baseRadius) {
+    if (!is_secret_theme_active()) return;
+
+    u64 t = osGetTime();
+    float pulse = 0.5f + 0.5f * sinf((float)(t % 2000) / 2000.0f * 6.2831853f);
+    float r1 = baseRadius * (1.15f + 0.18f * pulse);
+    float r2 = baseRadius * (1.35f + 0.22f * pulse);
+
+    C2D_DrawCircleSolid(cx, cy, 0.42f, r2, C2D_Color32(255, 215, 120, (u8)(30 + 25 * pulse)));
+    C2D_DrawCircleSolid(cx, cy, 0.43f, r1, C2D_Color32(255, 235, 170, (u8)(45 + 35 * pulse)));
+}
+
+// A diagonal light streak that sweeps across a rectangular area on a loop -
+// gives the header/footer bar a subtle "shine" pass when the secret theme
+// is active, like light glinting off polished gold.
+static void draw_secret_shine_sweep(float x, float y, float w, float h) {
+    if (!is_secret_theme_active()) return;
+
+    u64 t = osGetTime();
+    float cycle = (float)(t % 2600) / 2600.0f; // 0..1 loop
+    float sweepX = x - w * 0.4f + cycle * (w * 1.8f);
+    float bandW = w * 0.18f;
+
+    u32 shine = C2D_Color32(255, 255, 255, 55);
+    C2D_DrawTriangle(sweepX, y, shine, sweepX + bandW, y, shine, sweepX + bandW * 0.4f, y + h, shine, 0.48f);
+    C2D_DrawTriangle(sweepX + bandW * 0.4f, y + h, shine, sweepX - bandW * 0.6f, y + h, shine, sweepX, y, shine, 0.48f);
 }
 
 // ---------------------------------------------------------------------
@@ -1257,6 +1295,7 @@ static void draw_top_screen() {
 
     // Header bar
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, HEADER_H, C_BG);
+    draw_secret_shine_sweep(0, 0, SCREEN_W, HEADER_H);
     draw_text(8, 8, 0.62f, C_WHITE, "FoxWebChat");
 
     std::string statusLine = strlen(username) > 0 ? std::string(username) : "Not joined";
@@ -1388,7 +1427,9 @@ static void draw_bottom_screen() {
     const float SCREEN_W = 320.0f;
 
     C2D_DrawRectSolid(0, 0, 0.5f, SCREEN_W, 60, C_MID);
+    draw_secret_shine_sweep(0, 0, SCREEN_W, 60);
 
+    draw_secret_glow_ring(48, 30, 34);
     draw_fox(48, 30, 64);
     draw_text(90, 8, 0.62f, C_WHITE, "FoxWebChat");
     draw_text(90, 34, 0.42f, C_CREAM, "DarkFox Co.");
@@ -1464,12 +1505,15 @@ static void draw_progress_screen(const std::string& label, float progress) {
 static void draw_secret_unlocked_screen() {
     C2D_TargetClear(topTarget, C2D_Color32(212,175,55,255));
     C2D_SceneBegin(topTarget);
+    draw_secret_sparkles(400.0f, 240.0f, 3);
+    draw_secret_glow_ring(200, 90, 70);
     draw_fox(200, 90, 130);
     draw_text_centered(200, 158, 0.60f, C_BLACK, "You found a secret!");
     draw_text_centered(200, 190, 0.42f, C2D_Color32(40,30,10,255), "\"Secret Fox\" theme unlocked");
 
     C2D_TargetClear(bottomTarget, C2D_Color32(30,20,10,255));
     C2D_SceneBegin(bottomTarget);
+    draw_secret_sparkles(320.0f, 240.0f, 5);
     draw_text_centered(160, 100, 0.42f, C2D_Color32(212,175,55,255), "Shh... don't tell anyone.");
     draw_text_centered(160, 130, 0.34f, C2D_Color32(255,248,225,255), "Keep pressing D-Pad L/R to find it again anytime.");
 }
