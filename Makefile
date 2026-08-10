@@ -7,7 +7,7 @@ ICON        := resources/icon.png
 
 APP_TITLE   := FoxWebChat
 APP_AUTHOR  := DarkFox Co.
-APP_VERSION := 1.7.5
+APP_VERSION := 1.8.0
 
 # DevkitPro environment setup
 ifeq ($(strip $(DEVKITARM)),)
