@@ -94,6 +94,17 @@ static const Theme THEMES[] = {
                        C2D_Color32(15,55,53,255),   C2D_Color32(180,240,236,255),
                        C2D_Color32(230,60,60,255),  C2D_Color32(110,160,158,255),
                        C2D_Color32(15,55,53,255) },
+
+    // True night theme: unlike "Dunkel" (which keeps the chat area bright,
+    // since its "white" field is still near-white), this one sets "white" to
+    // a warm near-black so the whole top-screen chat background goes dark
+    // too. Warm, low-brightness tones throughout (no harsh pure white/blue)
+    // to be easier on the eyes at night.
+    { "Dark",          C2D_Color32(60,25,20,255),   C2D_Color32(35,15,12,255),
+                       C2D_Color32(18,16,20,255),   C2D_Color32(170,150,130,255),
+                       C2D_Color32(210,200,190,255), C2D_Color32(70,40,30,255),
+                       C2D_Color32(200,60,50,255),  C2D_Color32(120,105,95,255),
+                       C2D_Color32(200,185,170,255) },
 };
 static const int THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
 static std::vector<Theme> allThemes;  // built-in themes + loaded .fwct files
@@ -1264,8 +1275,8 @@ static void draw_secret_glow_ring(float cx, float cy, float baseRadius) {
     float r1 = baseRadius * (1.15f + 0.18f * pulse);
     float r2 = baseRadius * (1.35f + 0.22f * pulse);
 
-    C2D_DrawCircleSolid(cx, cy, 0.42f, r2, C2D_Color32(255, 215, 120, (u8)(30 + 25 * pulse)));
-    C2D_DrawCircleSolid(cx, cy, 0.43f, r1, C2D_Color32(255, 235, 170, (u8)(45 + 35 * pulse)));
+    C2D_DrawCircleSolid(cx, cy, 0.5f, r2, C2D_Color32(255, 215, 120, (u8)(30 + 25 * pulse)));
+    C2D_DrawCircleSolid(cx, cy, 0.5f, r1, C2D_Color32(255, 235, 170, (u8)(45 + 35 * pulse)));
 }
 
 // A diagonal light streak that sweeps across a rectangular area on a loop -
@@ -1280,8 +1291,8 @@ static void draw_secret_shine_sweep(float x, float y, float w, float h) {
     float bandW = w * 0.18f;
 
     u32 shine = C2D_Color32(255, 255, 255, 55);
-    C2D_DrawTriangle(sweepX, y, shine, sweepX + bandW, y, shine, sweepX + bandW * 0.4f, y + h, shine, 0.48f);
-    C2D_DrawTriangle(sweepX + bandW * 0.4f, y + h, shine, sweepX - bandW * 0.6f, y + h, shine, sweepX, y, shine, 0.48f);
+    C2D_DrawTriangle(sweepX, y, shine, sweepX + bandW, y, shine, sweepX + bandW * 0.4f, y + h, shine, 0.5f);
+    C2D_DrawTriangle(sweepX + bandW * 0.4f, y + h, shine, sweepX - bandW * 0.6f, y + h, shine, sweepX, y, shine, 0.5f);
 }
 
 // ---------------------------------------------------------------------
@@ -1595,7 +1606,7 @@ int main(int argc, char **argv) {
     topTarget = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
     bottomTarget = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     dynamicBuf = C2D_TextBufNew(4096);
-    measureBuf = C2D_TextBufNew(2048);
+    measureBuf = C2D_TextBufNew(4096);
 
     init_device_id();
     load_secret_flag();
