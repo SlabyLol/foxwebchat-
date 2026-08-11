@@ -23,6 +23,8 @@
 #define TECHNOBLADE_JOIN_TEXT "The Legend is here.... TECHNOBLADE JOINED"
 #define TECHNOBLADE_SOUND_PATH "sdmc:/3ds/FoxWebChat/technoblade.wav"
 #define TECHNOBLADE_SOUND_URL "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/main/tnd.wav"
+#define MENU_MUSIC_PATH "sdmc:/3ds/FoxWebChat/chat-menu-music.wav"
+#define MENU_MUSIC_URL "https://raw.githubusercontent.com/SlabyLol/foxwebchat-/main/chat-menu-music.wav"
 #define UPDATE_CIA_URL "https://github.com/SlabyLol/foxwebchat-/releases/download/nightly/FoxWebChat.cia"
 #define UPDATE_CIA_DIR "sdmc:/3ds/FoxWebChat"
 #define UPDATE_CIA_PATH "sdmc:/3ds/FoxWebChat/FoxWebChat.cia"
@@ -100,11 +102,11 @@ static const Theme THEMES[] = {
     // a warm near-black so the whole top-screen chat background goes dark
     // too. Warm, low-brightness tones throughout (no harsh pure white/blue)
     // to be easier on the eyes at night.
-    { "Dark",          C2D_Color32(60,25,20,255),   C2D_Color32(35,15,12,255),
-                       C2D_Color32(18,16,20,255),   C2D_Color32(170,150,130,255),
-                       C2D_Color32(210,200,190,255), C2D_Color32(70,40,30,255),
-                       C2D_Color32(200,60,50,255),  C2D_Color32(120,105,95,255),
-                       C2D_Color32(200,185,170,255) },
+    { "Dark",          C2D_Color32(45,48,58,255),   C2D_Color32(30,32,40,255),
+                       C2D_Color32(24,25,30,255),   C2D_Color32(200,203,212,255),
+                       C2D_Color32(225,227,235,255), C2D_Color32(55,60,72,255),
+                       C2D_Color32(230,70,70,255),  C2D_Color32(130,134,145,255),
+                       C2D_Color32(210,213,222,255) },
 };
 static const int THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);
 static std::vector<Theme> allThemes;  // built-in themes + loaded .fwct files
@@ -142,6 +144,7 @@ struct ChatMessage {
     std::string user;
     std::string text;
     std::string deviceId;
+    bool fromAdmin = false;
     std::vector<std::string> wrappedLines; // pre-wrapped for display, computed once when fetched
 };
 
@@ -308,6 +311,7 @@ static void ensure_dir(const char* path) {
 // Forward declarations - defined further down, but needed by functions above them.
 std::string parse_json_value(const std::string& block, const std::string& key);
 static long parse_json_number(const std::string& block, const std::string& key);
+static bool parse_json_bool(const std::string& block, const std::string& key);
 static std::vector<std::string> wrap_text_lines(const std::string& fullText, float maxWidth, float scale, int maxLines);
 
 // Parses a single "r,g,b(,a)" line from a .fwct file
@@ -589,6 +593,90 @@ static void play_technoblade_sound() {
 
     DSP_FlushDataCache(g_technobladeAudio.data, g_technobladeAudio.size);
     ndspChnWaveBufAdd(0, &g_technobladeWaveBuf);
+}
+
+// Menu background music - downloads once (the user's own file in their repo)
+// and loops on ndsp channel 1 while on the "not joined yet" menu screen.
+// Note: the loader only understands raw PCM WAV, not compressed MP3 - if the
+// source file is actually MP3-encoded, load_wav_file() will simply fail
+// (no RIFF/WAVE header) and this stays silent rather than crashing.
+static WavAudio g_menuMusicAudio;
+static ndspWaveBuf g_menuMusicWaveBuf;
+static bool g_menuMusicPlaying = false;
+
+static bool ensure_menu_music() {
+    FILE* existing = fopen(MENU_MUSIC_PATH, "rb");
+    if (existing) { fclose(existing); return true; }
+
+    ensure_dir("sdmc:/3ds");
+    ensure_dir(UPDATE_CIA_DIR);
+
+    FILE* fp = fopen(MENU_MUSIC_PATH, "wb");
+    if (!fp) return false;
+
+    CURL* curl = curl_easy_init();
+    bool ok = false;
+
+    if (curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, MENU_MUSIC_URL);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_USERAGENT, "FoxWebChat-3DS");
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 8L);
+
+        CURLcode res = curl_easy_perform(curl);
+        long httpCode = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpCode);
+        ok = (res == CURLE_OK && httpCode == 200);
+
+        curl_easy_cleanup(curl);
+    }
+
+    fclose(fp);
+    if (!ok) remove(MENU_MUSIC_PATH);
+    return ok;
+}
+
+static void start_menu_music() {
+    if (g_menuMusicPlaying) return;
+
+    if (!g_ndspReady) {
+        if (R_SUCCEEDED(ndspInit())) g_ndspReady = true;
+    }
+    if (!g_ndspReady) return;
+
+    static bool attemptedLoad = false;
+    if (!attemptedLoad) {
+        attemptedLoad = true;
+        ensure_menu_music();
+        load_wav_file(MENU_MUSIC_PATH, g_menuMusicAudio);
+    }
+    if (!g_menuMusicAudio.loaded) return;
+
+    ndspChnReset(1);
+    ndspChnWaveBufClear(1);
+    ndspChnSetInterp(1, NDSP_INTERP_LINEAR);
+    ndspChnSetRate(1, (float)g_menuMusicAudio.sampleRate);
+    ndspChnSetFormat(1, g_menuMusicAudio.channels == 2 ? NDSP_FORMAT_STEREO_PCM16 : NDSP_FORMAT_MONO_PCM16);
+
+    memset(&g_menuMusicWaveBuf, 0, sizeof(g_menuMusicWaveBuf));
+    g_menuMusicWaveBuf.data_vaddr = g_menuMusicAudio.data;
+    g_menuMusicWaveBuf.nsamples = g_menuMusicAudio.size / (2 * g_menuMusicAudio.channels);
+    g_menuMusicWaveBuf.looping = true;
+    g_menuMusicWaveBuf.status = NDSP_WBUF_FREE;
+
+    DSP_FlushDataCache(g_menuMusicAudio.data, g_menuMusicAudio.size);
+    ndspChnWaveBufAdd(1, &g_menuMusicWaveBuf);
+    g_menuMusicPlaying = true;
+}
+
+static void stop_menu_music() {
+    if (!g_menuMusicPlaying) return;
+    ndspChnWaveBufClear(1);
+    g_menuMusicPlaying = false;
 }
 
 static void init_themes() {
@@ -914,6 +1002,20 @@ static long parse_json_number(const std::string& block, const std::string& key) 
     return strtol(block.c_str() + start, nullptr, 10);
 }
 
+// Parses an unquoted boolean JSON value, e.g. "isAdmin":true
+static bool parse_json_bool(const std::string& block, const std::string& key) {
+    size_t keyPos = block.find("\"" + key + "\"");
+    if (keyPos == std::string::npos) return false;
+
+    size_t colonPos = block.find(":", keyPos);
+    if (colonPos == std::string::npos) return false;
+
+    size_t start = colonPos + 1;
+    while (start < block.size() && isspace((unsigned char)block[start])) start++;
+
+    return block.compare(start, 4, "true") == 0;
+}
+
 // Parses a flat JSON object of "key":"value" pairs (no nesting), e.g. the
 // "admins" node in Firebase: { "<admin code>": "<admin display name>", ... }
 static std::vector<std::pair<std::string, std::string>> parse_flat_json_object(const std::string& json) {
@@ -975,6 +1077,7 @@ void fetch_messages() {
                 msg.user = user;
                 msg.text = text;
                 msg.deviceId = deviceId;
+                msg.fromAdmin = parse_json_bool(block, "isAdmin");
 
                 std::string displayLine = "[" + user + "]: " + text;
                 msg.wrappedLines = wrap_text_lines(displayLine, 360.0f, 0.44f, 4);
@@ -1407,7 +1510,9 @@ static void draw_top_screen() {
 
             bool isSystemMsg = (messageList[i].user == "System");
             bool isTechnobladeJoin = isSystemMsg && (messageList[i].text == TECHNOBLADE_JOIN_TEXT);
-            u32 lineColor = isTechnobladeJoin ? C2D_Color32(220,30,30,255) : (sel ? C_MID : C_DARK);
+            u32 lineColor = isTechnobladeJoin ? C2D_Color32(220,30,30,255)
+                           : (messageList[i].fromAdmin ? C2D_Color32(220,40,40,255)
+                           : (sel ? C_MID : C_DARK));
 
             float textX = 8.0f;
             if (!isSystemMsg) {
@@ -1977,9 +2082,9 @@ int main(int argc, char **argv) {
                     char text[256] = "";
                     open_keyboard(text, sizeof(text), "Message...");
                     if (strlen(text) > 0) {
-                        char payload[600];
-                        snprintf(payload, sizeof(payload), "{\"user\":\"%s\",\"text\":\"%s\",\"deviceId\":\"%s\"}",
-                                 username, text, g_deviceIdHex.c_str());
+                        char payload[650];
+                        snprintf(payload, sizeof(payload), "{\"user\":\"%s\",\"text\":\"%s\",\"deviceId\":\"%s\",\"isAdmin\":%s}",
+                                 username, text, g_deviceIdHex.c_str(), isAdmin ? "true" : "false");
                         firebase_post("messages", payload);
                         followLatestMsg = true;
                         fetch_messages();
